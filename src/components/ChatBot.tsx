@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +71,7 @@ export const ChatBot: React.FC = () => {
   const [requestCount, setRequestCount] = useState(0);
   const [autoModeActive, setAutoModeActive] = useState(false);
   const [lastResponseTime, setLastResponseTime] = useState<number>(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -320,6 +320,13 @@ export const ChatBot: React.FC = () => {
     }
   };
 
+  // Focus input when component loads
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
   return (
     <Card className="w-full h-full flex flex-col overflow-hidden border-cyber-primary/30 shadow-lg bg-white/10 backdrop-blur-sm">
       <CardHeader className="bg-gradient-to-r from-cyber-primary to-cyber-secondary p-4">
@@ -424,13 +431,18 @@ export const ChatBot: React.FC = () => {
         
         <form onSubmit={handleSendMessage} className="flex space-x-2 w-full">
           <Input
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={isBlocked ? "Bot has been blocked" : "Ask about KITS Guntur..."}
             disabled={isBlocked || isTyping}
-            className="flex-grow"
+            className="flex-grow bg-white/20 backdrop-blur-sm text-white placeholder:text-gray-300 border-cyber-primary/30"
           />
-          <Button type="submit" disabled={isBlocked || !input.trim() || isTyping} size="sm">
+          <Button 
+            type="submit" 
+            disabled={isBlocked || !input.trim() || isTyping} 
+            className="bg-cyber-primary hover:bg-cyber-primary/80"
+          >
             <Send size={16} />
           </Button>
         </form>
