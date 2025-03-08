@@ -65,11 +65,13 @@ export const ChatBot: React.FC = () => {
     }
   ]);
   const [input, setInput] = useState('');
-  const { recordActivity, isBlocked, blockBot } = useBotDetection();
+  const { recordActivity, isBlocked, blockBot, currentSession } = useBotDetection();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [crawlRate, setCrawlRate] = useState('normal'); // 'slow', 'normal', 'aggressive'
   const [requestCount, setRequestCount] = useState(0);
+  const [autoModeActive, setAutoModeActive] = useState(false);
+  const [lastResponseTime, setLastResponseTime] = useState<number>(0);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -81,14 +83,58 @@ export const ChatBot: React.FC = () => {
 
   // Effect to monitor request count and trigger bot block if too many requests
   useEffect(() => {
-    if (requestCount > 10 && crawlRate === 'aggressive') {
-      blockBot('92a7f632-c8f2-45bc-b10a-3f36b51c8751', 'Excessive scraping detected (aggressive mode)');
-    } else if (requestCount > 15 && crawlRate === 'normal') {
-      blockBot('92a7f632-c8f2-45bc-b10a-3f36b51c8751', 'Excessive scraping detected (normal mode)');
-    } else if (requestCount > 20 && crawlRate === 'slow') {
-      blockBot('92a7f632-c8f2-45bc-b10a-3f36b51c8751', 'Excessive scraping detected (slow mode)');
+    const thresholds = {
+      slow: 10,
+      normal: 8,
+      aggressive: 5
+    };
+    
+    if (requestCount > thresholds[crawlRate as keyof typeof thresholds]) {
+      blockBot('92a7f632-c8f2-45bc-b10a-3f36b51c8751', `Excessive scraping detected (${crawlRate} mode)`);
+      setAutoModeActive(false);
     }
   }, [requestCount, crawlRate, blockBot]);
+
+  // Reset request count when crawl rate changes
+  useEffect(() => {
+    setRequestCount(0);
+  }, [crawlRate]);
+
+  // Effect to stop auto mode when blocked
+  useEffect(() => {
+    if (isBlocked && autoModeActive) {
+      setAutoModeActive(false);
+    }
+  }, [isBlocked, autoModeActive]);
+
+  // Auto mode effect for aggressive scraping
+  useEffect(() => {
+    let autoModeInterval: NodeJS.Timeout | null = null;
+    
+    if (autoModeActive && !isBlocked && crawlRate === 'aggressive') {
+      const followUpQuestions = [
+        'Tell me more about the faculty at KITS Guntur',
+        'What courses are offered at KITS Guntur?',
+        'Show me information about the campus facilities',
+        'What are the admission requirements for KITS Guntur?',
+        'Tell me about the college history'
+      ];
+      
+      autoModeInterval = setInterval(() => {
+        if (!isBlocked) {
+          const randomQuestion = followUpQuestions[Math.floor(Math.random() * followUpQuestions.length)];
+          setInput(randomQuestion);
+          handleSendMessage(new Event('submit') as any);
+        } else {
+          if (autoModeInterval) clearInterval(autoModeInterval);
+        }
+      }, 3000);
+    }
+    
+    return () => {
+      if (autoModeInterval) clearInterval(autoModeInterval);
+    };
+  }, [autoModeActive, isBlocked, crawlRate]);
 
   const generateId = () => {
     return Math.random().toString(36).substring(2, 9);
@@ -97,7 +143,23 @@ export const ChatBot: React.FC = () => {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!input.trim() || isBlocked) return;
+    if (!input.trim() || isBlocked || isTyping) return;
+    
+    // Prevent sending messages too quickly (bot-like behavior)
+    const now = Date.now();
+    const timeSinceLastResponse = now - lastResponseTime;
+    
+    if (timeSinceLastResponse < 500 && !autoModeActive) {
+      recordActivity({
+        type: 'apiRequest',
+        data: { message: input, type: 'suspiciousRapidFire' }
+      });
+      
+      setRequestCount(prev => prev + 2); // Penalize rapid firing of messages
+      return;
+    }
+    
+    setLastResponseTime(now);
     
     // Record the user message activity
     recordActivity({
@@ -114,22 +176,43 @@ export const ChatBot: React.FC = () => {
     };
     
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = input; // Store current input value
     setInput('');
     setIsTyping(true);
+    
+    // Generate multiple bot-like signals when in aggressive mode
+    if (crawlRate === 'aggressive') {
+      for (let i = 0; i < 3; i++) {
+        recordActivity({
+          type: 'apiRequest',
+          data: { url: `https://www.kitsguntur.ac.in/page${i}`, action: 'scraping', timestamp: Date.now() + i * 100 }
+        });
+      }
+    }
+    
+    // Increase request count
+    setRequestCount(prev => prev + 1);
     
     // Simulate bot thinking and response
     const botTypingTime = crawlRate === 'aggressive' ? 300 : crawlRate === 'normal' ? 1000 : 2000;
     
     setTimeout(() => {
-      const botResponse = generateBotResponse(input);
+      if (isBlocked) {
+        setIsTyping(false);
+        return;
+      }
       
-      // Increment request count
-      setRequestCount(prev => prev + 1);
+      const botResponse = generateBotResponse(currentInput);
       
       // Record the bot response as an API request (for detection purposes)
       recordActivity({
         type: 'apiRequest',
-        data: { responseType: 'chatResponse', crawlRate, targetSite: 'https://www.kitsguntur.ac.in/' }
+        data: { 
+          responseType: 'chatResponse', 
+          crawlRate, 
+          targetSite: 'https://www.kitsguntur.ac.in/',
+          timeToRespond: botTypingTime
+        }
       });
       
       // Add bot message
@@ -140,30 +223,11 @@ export const ChatBot: React.FC = () => {
         timestamp: new Date()
       };
       
-      setMessages(prev => [...prev, botMessage]);
-      setIsTyping(false);
-      
-      // If in aggressive mode, automatically ask another question
-      if (crawlRate === 'aggressive' && !isBlocked) {
-        const followUpQuestions = [
-          'Tell me more about the faculty at KITS Guntur',
-          'What courses are offered at KITS Guntur?',
-          'Show me information about the campus facilities',
-          'What are the admission requirements for KITS Guntur?',
-          'Tell me about the college history'
-        ];
-        
-        setTimeout(() => {
-          const randomQuestion = followUpQuestions[Math.floor(Math.random() * followUpQuestions.length)];
-          setInput(randomQuestion);
-          
-          setTimeout(() => {
-            if (!isBlocked) {
-              handleSendMessage(new Event('submit') as any);
-            }
-          }, 500);
-        }, 1500);
+      if (!isBlocked) {
+        setMessages(prev => [...prev, botMessage]);
       }
+      
+      setIsTyping(false);
     }, botTypingTime);
   };
 
@@ -196,6 +260,12 @@ export const ChatBot: React.FC = () => {
           data: { key: 'a', timeStamp: Date.now() + i }
         });
       }
+    } else if (crawlRate === 'normal') {
+      // Add some bot signals for normal mode too
+      recordActivity({
+        type: 'apiRequest',
+        data: { url: 'https://www.kitsguntur.ac.in/search', action: 'search' }
+      });
     }
     
     // Check for specific keywords in the query
@@ -241,6 +311,12 @@ export const ChatBot: React.FC = () => {
           data: { url: 'https://www.kitsguntur.ac.in/', action: 'repetitive-access' }
         });
       }
+      
+      // Enable auto mode when switching to aggressive
+      setAutoModeActive(true);
+    } else {
+      // Disable auto mode when switching away from aggressive
+      setAutoModeActive(false);
     }
   };
 
@@ -252,12 +328,20 @@ export const ChatBot: React.FC = () => {
             <Bot className="mr-2" size={20} />
             KITS Guntur Scraper Bot
           </CardTitle>
-          <Badge 
-            variant={isBlocked ? "destructive" : "outline"}
-            className={`text-xs ${isBlocked ? 'bg-red-600 text-white' : 'bg-white/20 text-white'}`}
-          >
-            {isBlocked ? 'BLOCKED' : 'ACTIVE'}
-          </Badge>
+          <div className="flex items-center space-x-2">
+            <Badge 
+              variant={autoModeActive ? "outline" : "secondary"}
+              className={`text-xs ${autoModeActive ? 'bg-purple-600 text-white' : 'bg-slate-700'}`}
+            >
+              {autoModeActive ? 'AUTO MODE' : 'MANUAL MODE'}
+            </Badge>
+            <Badge 
+              variant={isBlocked ? "destructive" : "outline"}
+              className={`text-xs ${isBlocked ? 'bg-red-600 text-white' : 'bg-white/20 text-white'}`}
+            >
+              {isBlocked ? 'BLOCKED' : 'ACTIVE'}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex-grow overflow-y-auto p-4 space-y-4 cyber-grid">
@@ -280,7 +364,7 @@ export const ChatBot: React.FC = () => {
             </div>
           </div>
         ))}
-        {isTyping && (
+        {isTyping && !isBlocked && (
           <div className="flex justify-start">
             <div className="max-w-[80%] rounded-lg p-3 bg-white/20 backdrop-blur-sm border border-cyber-primary/20">
               <div className="flex space-x-1">
@@ -302,34 +386,40 @@ export const ChatBot: React.FC = () => {
       )}
       
       <CardFooter className="p-4 border-t border-gray-200 space-y-2">
-        <div className="flex space-x-2 w-full mb-2">
-          <Button 
-            variant={crawlRate === 'slow' ? 'default' : 'outline'} 
-            size="sm" 
-            onClick={() => changeCrawlRate('slow')}
-            disabled={isBlocked}
-            className={crawlRate === 'slow' ? 'bg-green-600 hover:bg-green-700' : ''}
-          >
-            Slow Crawl
-          </Button>
-          <Button 
-            variant={crawlRate === 'normal' ? 'default' : 'outline'} 
-            size="sm" 
-            onClick={() => changeCrawlRate('normal')}
-            disabled={isBlocked}
-            className={crawlRate === 'normal' ? 'bg-amber-500 hover:bg-amber-600' : ''}
-          >
-            Normal Crawl
-          </Button>
-          <Button 
-            variant={crawlRate === 'aggressive' ? 'default' : 'outline'} 
-            size="sm" 
-            onClick={() => changeCrawlRate('aggressive')}
-            disabled={isBlocked}
-            className={crawlRate === 'aggressive' ? 'bg-red-600 hover:bg-red-700' : ''}
-          >
-            Aggressive Crawl
-          </Button>
+        <div className="flex justify-between w-full mb-2">
+          <div className="flex space-x-2">
+            <Button 
+              variant={crawlRate === 'slow' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => changeCrawlRate('slow')}
+              disabled={isBlocked}
+              className={crawlRate === 'slow' ? 'bg-green-600 hover:bg-green-700' : ''}
+            >
+              Slow Crawl
+            </Button>
+            <Button 
+              variant={crawlRate === 'normal' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => changeCrawlRate('normal')}
+              disabled={isBlocked}
+              className={crawlRate === 'normal' ? 'bg-amber-500 hover:bg-amber-600' : ''}
+            >
+              Normal Crawl
+            </Button>
+            <Button 
+              variant={crawlRate === 'aggressive' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => changeCrawlRate('aggressive')}
+              disabled={isBlocked}
+              className={crawlRate === 'aggressive' ? 'bg-red-600 hover:bg-red-700' : ''}
+            >
+              Aggressive
+            </Button>
+          </div>
+          
+          <Badge className="px-2 py-1 bg-cyber-dark/80">
+            Requests: {requestCount}
+          </Badge>
         </div>
         
         <form onSubmit={handleSendMessage} className="flex space-x-2 w-full">
@@ -337,10 +427,10 @@ export const ChatBot: React.FC = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={isBlocked ? "Bot has been blocked" : "Ask about KITS Guntur..."}
-            disabled={isBlocked}
+            disabled={isBlocked || isTyping}
             className="flex-grow"
           />
-          <Button type="submit" disabled={isBlocked || !input.trim()} size="sm">
+          <Button type="submit" disabled={isBlocked || !input.trim() || isTyping} size="sm">
             <Send size={16} />
           </Button>
         </form>

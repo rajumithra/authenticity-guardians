@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { UserSession, BotScore, UserActivity, BlockedBot, LogEntry, BotType } from '../models/BotDetectionTypes';
@@ -65,6 +64,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [activityHistory, setActivityHistory] = useState<UserActivity[]>([]);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [mouseMovementCount, setMouseMovementCount] = useState(0);
 
   // Initialize session
   useEffect(() => {
@@ -73,9 +73,16 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
     // Listen for mouse movements
     const handleMouseMove = (e: MouseEvent) => {
       if (currentSession && !currentSession.isBlocked) {
-        recordActivity({
-          type: 'mouseMove',
-          data: { x: e.clientX, y: e.clientY }
+        // Only record every 5th mouse movement to avoid flooding
+        setMouseMovementCount(prev => {
+          if (prev >= 4) {
+            recordActivity({
+              type: 'mouseMove',
+              data: { x: e.clientX, y: e.clientY }
+            });
+            return 0;
+          }
+          return prev + 1;
         });
       }
     };
@@ -190,21 +197,48 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
     setCurrentSession(prevSession => {
       if (!prevSession) return null;
       
-      const updatedActivities = [...prevSession.activities, newActivity].slice(-100); // Keep last 100 activities
+      // Keep a limited number of activities to avoid memory issues
+      const updatedActivities = [...prevSession.activities, newActivity];
+      const limitedActivities = updatedActivities.slice(-200); // Keep last 200 activities
+      
+      // Special handling for API requests - they increase bot score more rapidly
+      let rapidUpdatedScore = {...prevSession.botScore};
+      if (activity.type === 'apiRequest') {
+        const requestData = activity.data;
+        // Check for bot-like behavior in API requests
+        if (requestData.action === 'scrape' || requestData.action === 'rapid-scrape') {
+          rapidUpdatedScore.requestPattern = Math.min(100, rapidUpdatedScore.requestPattern + 5);
+          rapidUpdatedScore.total = Math.round(
+            (rapidUpdatedScore.mouseMovement * 0.3) +
+            (rapidUpdatedScore.keyboardPattern * 0.2) +
+            (rapidUpdatedScore.navigationPattern * 0.2) +
+            (rapidUpdatedScore.requestPattern * 0.15) +
+            (rapidUpdatedScore.timePattern * 0.15)
+          );
+        }
+      }
       
       return {
         ...prevSession,
-        activities: updatedActivities,
-        lastActive: Date.now()
+        activities: limitedActivities,
+        lastActive: Date.now(),
+        botScore: rapidUpdatedScore
       };
     });
 
-    // Add to activity history
+    // Add to activity history for display
     setActivityHistory(prev => [...prev, newActivity].slice(-50)); // Keep last 50 for display
+
+    // Log specific activities
+    if (activity.type === 'apiRequest' && activity.data.action === 'scrape') {
+      addLog('warning', `Scraping detected: ${activity.data.url}`, activity.data);
+    }
   };
 
   const blockBot = (sessionId: string, reason: string) => {
     if (!currentSession) return;
+
+    if (isBlocked) return; // Prevent multiple blocks
 
     setIsBlocked(true);
     setCurrentSession(prev => {
@@ -227,7 +261,13 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
         reason
       };
       
-      setBlockedBots(prev => [...prev, blockedBot]);
+      setBlockedBots(prev => {
+        // Check if already blocked to prevent duplicates
+        if (prev.some(bot => bot.sessionId === sessionId)) {
+          return prev;
+        }
+        return [...prev, blockedBot];
+      });
       
       addLog('warning', `Bot blocked: ${sessionId}`, {
         reason,
@@ -245,6 +285,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const resetSession = () => {
     initSession();
+    addLog('info', 'Session reset by user');
   };
 
   const addLog = (level: 'info' | 'warning' | 'error', message: string, data?: any) => {
