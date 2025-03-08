@@ -20,7 +20,6 @@ interface SampleWebsite {
   content: string;
 }
 
-// Sample websites for the bot to scrape
 const sampleWebsites: SampleWebsite[] = [
   {
     id: '1',
@@ -67,7 +66,7 @@ export const ChatBot: React.FC = () => {
   const { recordActivity, isBlocked, blockBot, currentSession } = useBotDetection();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const [crawlRate, setCrawlRate] = useState('normal'); // 'slow', 'normal', 'aggressive'
+  const [crawlRate, setCrawlRate] = useState('normal');
   const [requestCount, setRequestCount] = useState(0);
   const [autoModeActive, setAutoModeActive] = useState(false);
   const [lastResponseTime, setLastResponseTime] = useState<number>(0);
@@ -81,7 +80,6 @@ export const ChatBot: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Effect to monitor request count and trigger bot block if too many requests
   useEffect(() => {
     const thresholds = {
       slow: 10,
@@ -95,19 +93,16 @@ export const ChatBot: React.FC = () => {
     }
   }, [requestCount, crawlRate, blockBot]);
 
-  // Reset request count when crawl rate changes
   useEffect(() => {
     setRequestCount(0);
   }, [crawlRate]);
 
-  // Effect to stop auto mode when blocked
   useEffect(() => {
     if (isBlocked && autoModeActive) {
       setAutoModeActive(false);
     }
   }, [isBlocked, autoModeActive]);
 
-  // Auto mode effect for aggressive scraping
   useEffect(() => {
     let autoModeInterval: NodeJS.Timeout | null = null;
     
@@ -145,7 +140,6 @@ export const ChatBot: React.FC = () => {
     
     if (!input.trim() || isBlocked || isTyping) return;
     
-    // Prevent sending messages too quickly (bot-like behavior)
     const now = Date.now();
     const timeSinceLastResponse = now - lastResponseTime;
     
@@ -155,19 +149,17 @@ export const ChatBot: React.FC = () => {
         data: { message: input, type: 'suspiciousRapidFire' }
       });
       
-      setRequestCount(prev => prev + 2); // Penalize rapid firing of messages
+      setRequestCount(prev => prev + 2);
       return;
     }
     
     setLastResponseTime(now);
     
-    // Record the user message activity
     recordActivity({
       type: 'apiRequest',
       data: { message: input, type: 'chatRequest' }
     });
     
-    // Add user message
     const userMessage: Message = {
       id: generateId(),
       sender: 'user',
@@ -176,11 +168,10 @@ export const ChatBot: React.FC = () => {
     };
     
     setMessages(prev => [...prev, userMessage]);
-    const currentInput = input; // Store current input value
+    const currentInput = input;
     setInput('');
     setIsTyping(true);
     
-    // Generate multiple bot-like signals when in aggressive mode
     if (crawlRate === 'aggressive') {
       for (let i = 0; i < 3; i++) {
         recordActivity({
@@ -190,10 +181,8 @@ export const ChatBot: React.FC = () => {
       }
     }
     
-    // Increase request count
     setRequestCount(prev => prev + 1);
     
-    // Simulate bot thinking and response
     const botTypingTime = crawlRate === 'aggressive' ? 300 : crawlRate === 'normal' ? 1000 : 2000;
     
     setTimeout(() => {
@@ -204,7 +193,6 @@ export const ChatBot: React.FC = () => {
       
       const botResponse = generateBotResponse(currentInput);
       
-      // Record the bot response as an API request (for detection purposes)
       recordActivity({
         type: 'apiRequest',
         data: { 
@@ -215,7 +203,6 @@ export const ChatBot: React.FC = () => {
         }
       });
       
-      // Add bot message
       const botMessage: Message = {
         id: generateId(),
         sender: 'bot',
@@ -232,10 +219,8 @@ export const ChatBot: React.FC = () => {
   };
 
   const generateBotResponse = (query: string): string => {
-    // Convert query to lowercase for easier matching
     const queryLower = query.toLowerCase();
     
-    // Record multiple crawling activities to simulate scraping
     for (const website of sampleWebsites) {
       recordActivity({
         type: 'apiRequest',
@@ -243,9 +228,7 @@ export const ChatBot: React.FC = () => {
       });
     }
     
-    // Create artificially high bot detection signals based on crawl rate
     if (crawlRate === 'aggressive') {
-      // Generate multiple rapid requests to trigger bot detection
       for (let i = 0; i < 5; i++) {
         recordActivity({
           type: 'apiRequest',
@@ -253,7 +236,6 @@ export const ChatBot: React.FC = () => {
         });
       }
       
-      // Create unnatural keyboard pattern
       for (let i = 0; i < 3; i++) {
         recordActivity({
           type: 'keyPress',
@@ -261,14 +243,12 @@ export const ChatBot: React.FC = () => {
         });
       }
     } else if (crawlRate === 'normal') {
-      // Add some bot signals for normal mode too
       recordActivity({
         type: 'apiRequest',
         data: { url: 'https://www.kitsguntur.ac.in/search', action: 'search' }
       });
     }
     
-    // Check for specific keywords in the query
     if (queryLower.includes('course') || queryLower.includes('program') || queryLower.includes('degree') || queryLower.includes('btech') || queryLower.includes('mtech')) {
       return `Based on information from ${sampleWebsites[1].url}: ${sampleWebsites[1].content}`;
     }
@@ -289,7 +269,6 @@ export const ChatBot: React.FC = () => {
       return `From ${sampleWebsites[0].url}: ${sampleWebsites[0].content}`;
     }
     
-    // Default response if no specific match
     const randomSite = sampleWebsites[Math.floor(Math.random() * sampleWebsites.length)];
     return `I searched and found this information from ${randomSite.url}: ${randomSite.content}`;
   };
@@ -302,9 +281,7 @@ export const ChatBot: React.FC = () => {
       data: { settingChange: 'crawlRate', newValue: rate }
     });
     
-    // When switching to aggressive mode, create more bot-like signals
     if (rate === 'aggressive') {
-      // Simulate bot-like behavior with repeated identical requests
       for (let i = 0; i < 3; i++) {
         recordActivity({
           type: 'apiRequest',
@@ -312,15 +289,12 @@ export const ChatBot: React.FC = () => {
         });
       }
       
-      // Enable auto mode when switching to aggressive
       setAutoModeActive(true);
     } else {
-      // Disable auto mode when switching away from aggressive
       setAutoModeActive(false);
     }
   };
 
-  // Focus input when component loads
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
@@ -351,6 +325,7 @@ export const ChatBot: React.FC = () => {
           </div>
         </div>
       </CardHeader>
+      
       <CardContent className="flex-grow overflow-y-auto p-4 space-y-4 cyber-grid">
         {messages.map(message => (
           <div
@@ -371,6 +346,7 @@ export const ChatBot: React.FC = () => {
             </div>
           </div>
         ))}
+        
         {isTyping && !isBlocked && (
           <div className="flex justify-start">
             <div className="max-w-[80%] rounded-lg p-3 bg-white/20 backdrop-blur-sm border border-cyber-primary/20">
@@ -382,6 +358,7 @@ export const ChatBot: React.FC = () => {
             </div>
           </div>
         )}
+        
         <div ref={messagesEndRef} />
       </CardContent>
       
@@ -392,7 +369,7 @@ export const ChatBot: React.FC = () => {
         </div>
       )}
       
-      <CardFooter className="p-4 border-t border-gray-200 space-y-2">
+      <CardFooter className="p-4 border-t border-gray-100/20 space-y-2">
         <div className="flex justify-between w-full mb-2">
           <div className="flex space-x-2">
             <Button 
@@ -429,7 +406,7 @@ export const ChatBot: React.FC = () => {
           </Badge>
         </div>
         
-        <form onSubmit={handleSendMessage} className="flex space-x-2 w-full">
+        <form onSubmit={handleSendMessage} className="flex w-full space-x-2">
           <Input
             ref={inputRef}
             value={input}

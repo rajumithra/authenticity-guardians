@@ -47,6 +47,9 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
     if (Math.random() > 0.7) {
       newScore.keyboardPattern = Math.min(100, newScore.keyboardPattern + 1);
     }
+  } else {
+    // No keyboard activity is slightly suspicious
+    newScore.keyboardPattern = Math.min(100, botScore.keyboardPattern + 1);
   }
   
   // Analyze navigation patterns (clicks)
@@ -63,6 +66,9 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
     if (Math.random() > 0.8) {
       newScore.navigationPattern = Math.min(100, newScore.navigationPattern + 2);
     }
+  } else {
+    // No clicks is slightly suspicious
+    newScore.navigationPattern = Math.min(100, botScore.navigationPattern + 1);
   }
   
   // Analyze request patterns (API calls)
@@ -72,11 +78,11 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
     // Bots might make many similar calls rapidly
     const requestNaturality = calculateRequestNaturality(apiRequests);
     
-    // Update the score
-    newScore.requestPattern = Math.max(0, botScore.requestPattern - requestNaturality);
+    // Update the score - increase weight for API requests to detect scraping faster
+    newScore.requestPattern = Math.max(0, newScore.requestPattern - requestNaturality + 3);
     
-    // Random increase
-    if (Math.random() > 0.7) {
+    // Random increase with higher probability
+    if (Math.random() > 0.6) {
       newScore.requestPattern = Math.min(100, newScore.requestPattern + 3);
     }
   }
@@ -85,12 +91,12 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
   const timeNaturality = calculateTimeNaturality(recentActivities);
   newScore.timePattern = Math.max(0, Math.min(100, botScore.timePattern - timeNaturality + (Math.random() > 0.7 ? 2 : 0)));
   
-  // Calculate overall bot score (weighted average)
+  // Calculate overall bot score (weighted average) - increase API request weight
   newScore.total = Math.round(
-    (newScore.mouseMovement * 0.3) +
+    (newScore.mouseMovement * 0.25) +
     (newScore.keyboardPattern * 0.2) +
-    (newScore.navigationPattern * 0.2) +
-    (newScore.requestPattern * 0.15) +
+    (newScore.navigationPattern * 0.15) +
+    (newScore.requestPattern * 0.25) + // Increased weight for API requests
     (newScore.timePattern * 0.15)
   );
   
@@ -129,7 +135,8 @@ function calculateTypingNaturality(keyPresses: any[]): number {
   const stdDev = Math.sqrt(variance);
   
   // Convert to a 0-5 scale (higher is more natural)
-  return Math.min(5, stdDev / 100);
+  // Increased to show more dynamic changes
+  return Math.min(5, stdDev / 100) * 1.5;
 }
 
 function calculateClickNaturality(clicks: any[]): number {
