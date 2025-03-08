@@ -27,19 +27,31 @@ const sampleWebsites: SampleWebsite[] = [
     id: '1',
     url: 'https://www.kitsguntur.ac.in/',
     title: 'KITS Guntur College',
-    content: 'KITS Guntur is a premier educational institution offering various engineering courses. The college has state-of-the-art facilities and experienced faculty. Established in 1998, it has been ranked among the top engineering colleges in the region.'
+    content: 'KITS Guntur is an autonomous institution affiliated with Acharya Nagarjuna University. It offers undergraduate and postgraduate programs in Engineering, Management, and Computer Applications. The college has state-of-the-art facilities and experienced faculty. Established in 1998, it has been ranked among the top engineering colleges in the region.'
   },
   {
     id: '2',
-    url: 'https://www.example.com/courses',
-    title: 'Available Courses',
-    content: 'Our institution offers a variety of courses including Computer Science, Electronics, Mechanical Engineering, Civil Engineering, and Information Technology. Each program is designed with industry collaboration to ensure students gain practical knowledge.'
+    url: 'https://www.kitsguntur.ac.in/courses',
+    title: 'KITS Guntur - Available Courses',
+    content: 'KITS Guntur offers various courses including B.Tech in Computer Science, Electronics & Communication, Electrical & Electronics, Mechanical, Civil, and Information Technology. The college also offers M.Tech, MCA, and MBA programs. The curriculum is industry-oriented with focus on practical learning and skill development.'
   },
   {
     id: '3',
-    url: 'https://www.example.com/faculty',
-    title: 'Faculty Information',
-    content: 'Our faculty consists of highly qualified professors with PhD degrees from prestigious universities. Many have industry experience and research publications in international journals. The student-to-faculty ratio is maintained at 15:1.'
+    url: 'https://www.kitsguntur.ac.in/faculty',
+    title: 'KITS Guntur - Faculty Information',
+    content: 'KITS Guntur has a team of highly qualified faculty members with PhD degrees and industry experience. The faculty regularly publishes research papers in international journals and attends conferences. The student-to-faculty ratio is maintained at 15:1 to ensure personalized attention to students.'
+  },
+  {
+    id: '4',
+    url: 'https://www.kitsguntur.ac.in/facilities',
+    title: 'KITS Guntur - Campus Facilities',
+    content: 'KITS Guntur campus is spread over 13 acres with modern infrastructure including well-equipped laboratories, a central library with over 50,000 books, digital learning resources, sports facilities, seminar halls, and hostels for boys and girls. The campus has Wi-Fi connectivity and 24/7 power backup.'
+  },
+  {
+    id: '5',
+    url: 'https://www.kitsguntur.ac.in/admissions',
+    title: 'KITS Guntur - Admission Process',
+    content: 'Admissions to KITS Guntur are based on merit in entrance examinations like EAMCET for undergraduate courses and PGCET/ICET for postgraduate courses. The college also offers scholarships to meritorious students and those from economically weaker sections. The academic year typically starts in July/August.'
   }
 ];
 
@@ -48,15 +60,16 @@ export const ChatBot: React.FC = () => {
     {
       id: '1',
       sender: 'bot',
-      text: 'Hello! I am an AI assistant. Ask me about any of the sample websites, and I can retrieve information for you.',
+      text: 'Hello! I am an AI assistant for KITS Guntur College. Ask me anything about the college, courses, faculty, facilities, or admission process.',
       timestamp: new Date()
     }
   ]);
   const [input, setInput] = useState('');
-  const { recordActivity, isBlocked } = useBotDetection();
+  const { recordActivity, isBlocked, blockBot } = useBotDetection();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [crawlRate, setCrawlRate] = useState('normal'); // 'slow', 'normal', 'aggressive'
+  const [requestCount, setRequestCount] = useState(0);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -65,6 +78,17 @@ export const ChatBot: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Effect to monitor request count and trigger bot block if too many requests
+  useEffect(() => {
+    if (requestCount > 10 && crawlRate === 'aggressive') {
+      blockBot('92a7f632-c8f2-45bc-b10a-3f36b51c8751', 'Excessive scraping detected (aggressive mode)');
+    } else if (requestCount > 15 && crawlRate === 'normal') {
+      blockBot('92a7f632-c8f2-45bc-b10a-3f36b51c8751', 'Excessive scraping detected (normal mode)');
+    } else if (requestCount > 20 && crawlRate === 'slow') {
+      blockBot('92a7f632-c8f2-45bc-b10a-3f36b51c8751', 'Excessive scraping detected (slow mode)');
+    }
+  }, [requestCount, crawlRate, blockBot]);
 
   const generateId = () => {
     return Math.random().toString(36).substring(2, 9);
@@ -99,10 +123,13 @@ export const ChatBot: React.FC = () => {
     setTimeout(() => {
       const botResponse = generateBotResponse(input);
       
+      // Increment request count
+      setRequestCount(prev => prev + 1);
+      
       // Record the bot response as an API request (for detection purposes)
       recordActivity({
         type: 'apiRequest',
-        data: { responseType: 'chatResponse', crawlRate }
+        data: { responseType: 'chatResponse', crawlRate, targetSite: 'https://www.kitsguntur.ac.in/' }
       });
       
       // Add bot message
@@ -119,10 +146,10 @@ export const ChatBot: React.FC = () => {
       // If in aggressive mode, automatically ask another question
       if (crawlRate === 'aggressive' && !isBlocked) {
         const followUpQuestions = [
-          'Tell me more about the faculty',
-          'What courses are offered?',
-          'Show me information about the campus',
-          'What are the admission requirements?',
+          'Tell me more about the faculty at KITS Guntur',
+          'What courses are offered at KITS Guntur?',
+          'Show me information about the campus facilities',
+          'What are the admission requirements for KITS Guntur?',
           'Tell me about the college history'
         ];
         
@@ -131,7 +158,9 @@ export const ChatBot: React.FC = () => {
           setInput(randomQuestion);
           
           setTimeout(() => {
-            handleSendMessage(new Event('submit') as any);
+            if (!isBlocked) {
+              handleSendMessage(new Event('submit') as any);
+            }
           }, 500);
         }, 1500);
       }
@@ -142,7 +171,7 @@ export const ChatBot: React.FC = () => {
     // Convert query to lowercase for easier matching
     const queryLower = query.toLowerCase();
     
-    // Record crawling activity
+    // Record multiple crawling activities to simulate scraping
     for (const website of sampleWebsites) {
       recordActivity({
         type: 'apiRequest',
@@ -152,25 +181,42 @@ export const ChatBot: React.FC = () => {
     
     // Create artificially high bot detection signals based on crawl rate
     if (crawlRate === 'aggressive') {
+      // Generate multiple rapid requests to trigger bot detection
       for (let i = 0; i < 5; i++) {
         recordActivity({
           type: 'apiRequest',
-          data: { url: 'multiple-requests', action: 'rapid-scrape' }
+          data: { url: 'https://www.kitsguntur.ac.in/multiple-urls', action: 'rapid-scrape' }
+        });
+      }
+      
+      // Create unnatural keyboard pattern
+      for (let i = 0; i < 3; i++) {
+        recordActivity({
+          type: 'keyPress',
+          data: { key: 'a', timeStamp: Date.now() + i }
         });
       }
     }
     
     // Check for specific keywords in the query
-    if (queryLower.includes('course') || queryLower.includes('program') || queryLower.includes('degree')) {
-      return `Based on the information I've scraped from ${sampleWebsites[1].url}, ${sampleWebsites[1].content}`;
+    if (queryLower.includes('course') || queryLower.includes('program') || queryLower.includes('degree') || queryLower.includes('btech') || queryLower.includes('mtech')) {
+      return `Based on information from ${sampleWebsites[1].url}: ${sampleWebsites[1].content}`;
     }
     
-    if (queryLower.includes('faculty') || queryLower.includes('professor') || queryLower.includes('teacher')) {
-      return `According to ${sampleWebsites[2].url}, ${sampleWebsites[2].content}`;
+    if (queryLower.includes('faculty') || queryLower.includes('professor') || queryLower.includes('teacher') || queryLower.includes('staff')) {
+      return `According to ${sampleWebsites[2].url}: ${sampleWebsites[2].content}`;
     }
     
-    if (queryLower.includes('college') || queryLower.includes('kits') || queryLower.includes('about')) {
-      return `From ${sampleWebsites[0].url}, I found that ${sampleWebsites[0].content}`;
+    if (queryLower.includes('campus') || queryLower.includes('facilit') || queryLower.includes('lab') || queryLower.includes('hostel') || queryLower.includes('library')) {
+      return `From ${sampleWebsites[3].url}: ${sampleWebsites[3].content}`;
+    }
+    
+    if (queryLower.includes('admission') || queryLower.includes('apply') || queryLower.includes('entrance') || queryLower.includes('scholarship') || queryLower.includes('fee')) {
+      return `As per ${sampleWebsites[4].url}: ${sampleWebsites[4].content}`;
+    }
+    
+    if (queryLower.includes('college') || queryLower.includes('kits') || queryLower.includes('about') || queryLower.includes('guntur')) {
+      return `From ${sampleWebsites[0].url}: ${sampleWebsites[0].content}`;
     }
     
     // Default response if no specific match
@@ -185,6 +231,17 @@ export const ChatBot: React.FC = () => {
       type: 'apiRequest',
       data: { settingChange: 'crawlRate', newValue: rate }
     });
+    
+    // When switching to aggressive mode, create more bot-like signals
+    if (rate === 'aggressive') {
+      // Simulate bot-like behavior with repeated identical requests
+      for (let i = 0; i < 3; i++) {
+        recordActivity({
+          type: 'apiRequest',
+          data: { url: 'https://www.kitsguntur.ac.in/', action: 'repetitive-access' }
+        });
+      }
+    }
   };
 
   return (
@@ -193,7 +250,7 @@ export const ChatBot: React.FC = () => {
         <div className="flex items-center justify-between">
           <CardTitle className="text-white flex items-center">
             <Bot className="mr-2" size={20} />
-            Scraper Bot Simulator
+            KITS Guntur Scraper Bot
           </CardTitle>
           <Badge 
             variant={isBlocked ? "destructive" : "outline"}
@@ -240,7 +297,7 @@ export const ChatBot: React.FC = () => {
       {isBlocked && (
         <div className="p-4 bg-red-600/90 text-white flex items-center justify-center">
           <AlertCircle className="mr-2" size={16} />
-          <span className="text-sm font-medium">This bot has been blocked due to suspicious activity</span>
+          <span className="text-sm font-medium">This bot has been blocked due to suspicious scraping activity</span>
         </div>
       )}
       
@@ -279,7 +336,7 @@ export const ChatBot: React.FC = () => {
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isBlocked ? "Bot has been blocked" : "Type a message..."}
+            placeholder={isBlocked ? "Bot has been blocked" : "Ask about KITS Guntur..."}
             disabled={isBlocked}
             className="flex-grow"
           />

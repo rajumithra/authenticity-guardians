@@ -41,7 +41,7 @@ const initialBotScore: BotScore = {
   timePattern: 0,
 };
 
-// Simulate getting IP and device info
+// Get device info
 const getDeviceInfo = () => {
   return {
     browser: navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Other',
@@ -54,10 +54,10 @@ const getDeviceInfo = () => {
   };
 };
 
-// Generate a fake IP for demo purposes
-const generateFakeIp = () => {
-  return `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
-};
+// Create a fixed fake IP to prevent changing
+const FIXED_IP = '192.168.1.101';
+// Create a fixed session ID to prevent changing
+const FIXED_SESSION_ID = '92a7f632-c8f2-45bc-b10a-3f36b51c8751';
 
 export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentSession, setCurrentSession] = useState<UserSession | null>(null);
@@ -159,10 +159,10 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, [currentSession]);
 
   const initSession = () => {
-    const sessionId = uuidv4();
+    // Use fixed session ID instead of generating a new one
     const newSession: UserSession = {
-      id: sessionId,
-      ip: generateFakeIp(),
+      id: FIXED_SESSION_ID,
+      ip: FIXED_IP, // Use fixed IP
       userAgent: navigator.userAgent,
       startTime: Date.now(),
       lastActive: Date.now(),
@@ -174,7 +174,8 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
     };
 
     setCurrentSession(newSession);
-    addLog('info', `New session started: ${sessionId}`);
+    setIsBlocked(false);
+    addLog('info', `New session started: ${FIXED_SESSION_ID}`);
   };
 
   const recordActivity = (activity: Omit<UserActivity, 'timestamp'>) => {
@@ -244,8 +245,6 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const resetSession = () => {
     initSession();
-    setIsBlocked(false);
-    addLog('info', 'Session reset');
   };
 
   const addLog = (level: 'info' | 'warning' | 'error', message: string, data?: any) => {
