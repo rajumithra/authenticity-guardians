@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,10 +82,17 @@ export const ChatBot: React.FC = () => {
   }, [messages]);
 
   useEffect(() => {
+    // Focus the input field when component mounts
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  useEffect(() => {
     const thresholds = {
-      slow: 10,
-      normal: 8,
-      aggressive: 5
+      slow: 8, // Reduced from 10 to 8
+      normal: 6, // Reduced from 8 to 6
+      aggressive: 4  // Reduced from 5 to 4
     };
     
     if (requestCount > thresholds[crawlRate as keyof typeof thresholds]) {
@@ -155,6 +163,7 @@ export const ChatBot: React.FC = () => {
     
     setLastResponseTime(now);
     
+    // Record the chat request as an API request
     recordActivity({
       type: 'apiRequest',
       data: { message: input, type: 'chatRequest' }
@@ -172,11 +181,16 @@ export const ChatBot: React.FC = () => {
     setInput('');
     setIsTyping(true);
     
+    // Special behavior for aggressive mode - simulate multiple rapid scraping requests
     if (crawlRate === 'aggressive') {
       for (let i = 0; i < 3; i++) {
         recordActivity({
           type: 'apiRequest',
-          data: { url: `https://www.kitsguntur.ac.in/page${i}`, action: 'scraping', timestamp: Date.now() + i * 100 }
+          data: { 
+            url: `https://www.kitsguntur.ac.in/page${i}`, 
+            action: 'rapid-scrape', 
+            timestamp: Date.now() + i * 100 
+          }
         });
       }
     }
@@ -221,6 +235,8 @@ export const ChatBot: React.FC = () => {
   const generateBotResponse = (query: string): string => {
     const queryLower = query.toLowerCase();
     
+    // When generating a response, simulate accessing all website data
+    // This is a key part of the scraping behavior that should trigger detection
     for (const website of sampleWebsites) {
       recordActivity({
         type: 'apiRequest',
@@ -228,6 +244,7 @@ export const ChatBot: React.FC = () => {
       });
     }
     
+    // In aggressive mode, simulate intensive scraping
     if (crawlRate === 'aggressive') {
       for (let i = 0; i < 5; i++) {
         recordActivity({
@@ -236,6 +253,7 @@ export const ChatBot: React.FC = () => {
         });
       }
       
+      // Also simulate bot-like keyboard activity (very consistent timing)
       for (let i = 0; i < 3; i++) {
         recordActivity({
           type: 'keyPress',
@@ -243,12 +261,14 @@ export const ChatBot: React.FC = () => {
         });
       }
     } else if (crawlRate === 'normal') {
+      // Normal mode does less intensive scraping
       recordActivity({
         type: 'apiRequest',
         data: { url: 'https://www.kitsguntur.ac.in/search', action: 'search' }
       });
     }
     
+    // Match query to relevant data from "scraped" websites
     if (queryLower.includes('course') || queryLower.includes('program') || queryLower.includes('degree') || queryLower.includes('btech') || queryLower.includes('mtech')) {
       return `Based on information from ${sampleWebsites[1].url}: ${sampleWebsites[1].content}`;
     }
@@ -269,6 +289,7 @@ export const ChatBot: React.FC = () => {
       return `From ${sampleWebsites[0].url}: ${sampleWebsites[0].content}`;
     }
     
+    // For unmatched queries, return random information 
     const randomSite = sampleWebsites[Math.floor(Math.random() * sampleWebsites.length)];
     return `I searched and found this information from ${randomSite.url}: ${randomSite.content}`;
   };
@@ -282,6 +303,7 @@ export const ChatBot: React.FC = () => {
     });
     
     if (rate === 'aggressive') {
+      // Simulate aggressive behavior immediately when switching to this mode
       for (let i = 0; i < 3; i++) {
         recordActivity({
           type: 'apiRequest',
@@ -294,12 +316,6 @@ export const ChatBot: React.FC = () => {
       setAutoModeActive(false);
     }
   };
-
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, []);
 
   return (
     <Card className="w-full h-full flex flex-col overflow-hidden border-cyber-primary/30 shadow-lg bg-white/10 backdrop-blur-sm">

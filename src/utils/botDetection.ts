@@ -30,7 +30,7 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
     }
   } else {
     // No mouse movements is suspicious, gradually increase score
-    newScore.mouseMovement = Math.min(100, botScore.mouseMovement + 2);
+    newScore.mouseMovement = Math.min(100, botScore.mouseMovement + 3); // Increased from 2 to 3
   }
   
   // Analyze keyboard patterns
@@ -49,7 +49,7 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
     }
   } else {
     // No keyboard activity is slightly suspicious
-    newScore.keyboardPattern = Math.min(100, botScore.keyboardPattern + 1);
+    newScore.keyboardPattern = Math.min(100, botScore.keyboardPattern + 2); // Increased from 1 to 2
   }
   
   // Analyze navigation patterns (clicks)
@@ -68,36 +68,47 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
     }
   } else {
     // No clicks is slightly suspicious
-    newScore.navigationPattern = Math.min(100, botScore.navigationPattern + 1);
+    newScore.navigationPattern = Math.min(100, botScore.navigationPattern + 2); // Increased from 1 to 2
   }
   
   // Analyze request patterns (API calls)
   const apiRequests = recentActivities.filter(a => a.type === 'apiRequest');
   if (apiRequests.length > 0) {
-    // Humans make fewer API calls and with more variation
-    // Bots might make many similar calls rapidly
-    const requestNaturality = calculateRequestNaturality(apiRequests);
+    // Detect scraping-specific API requests
+    const scrapingRequests = apiRequests.filter(a => 
+      (a.data.action === 'scrape' || a.data.action === 'rapid-scrape' || 
+       (a.data.url && a.data.url.includes('kitsguntur.ac.in')))
+    );
     
-    // Update the score - increase weight for API requests to detect scraping faster
-    newScore.requestPattern = Math.max(0, newScore.requestPattern - requestNaturality + 3);
-    
-    // Random increase with higher probability
-    if (Math.random() > 0.6) {
-      newScore.requestPattern = Math.min(100, newScore.requestPattern + 3);
+    // If scraping requests found, heavily increase the score
+    if (scrapingRequests.length > 0) {
+      // More aggressive penalty for scraping
+      newScore.requestPattern = Math.min(100, botScore.requestPattern + scrapingRequests.length * 5);
+    } else {
+      // For regular API requests, analyze normally
+      const requestNaturality = calculateRequestNaturality(apiRequests);
+      
+      // Update the score - increase weight for API requests to detect scraping faster
+      newScore.requestPattern = Math.max(0, newScore.requestPattern - requestNaturality + 5); // Increased from 3 to 5
+      
+      // Random increase with higher probability
+      if (Math.random() > 0.5) { // Changed from 0.6 to 0.5
+        newScore.requestPattern = Math.min(100, newScore.requestPattern + 5); // Increased from 3 to 5
+      }
     }
   }
   
   // Analyze time patterns (overall session behavior)
   const timeNaturality = calculateTimeNaturality(recentActivities);
-  newScore.timePattern = Math.max(0, Math.min(100, botScore.timePattern - timeNaturality + (Math.random() > 0.7 ? 2 : 0)));
+  newScore.timePattern = Math.max(0, Math.min(100, botScore.timePattern - timeNaturality + (Math.random() > 0.6 ? 3 : 0))); // Increased randomness
   
   // Calculate overall bot score (weighted average) - increase API request weight
   newScore.total = Math.round(
-    (newScore.mouseMovement * 0.25) +
-    (newScore.keyboardPattern * 0.2) +
+    (newScore.mouseMovement * 0.20) +
+    (newScore.keyboardPattern * 0.20) +
     (newScore.navigationPattern * 0.15) +
-    (newScore.requestPattern * 0.25) + // Increased weight for API requests
-    (newScore.timePattern * 0.15)
+    (newScore.requestPattern * 0.35) + // Increased weight for API requests from 0.25 to 0.35
+    (newScore.timePattern * 0.10)  // Decreased from 0.15 to 0.10
   );
   
   return newScore;
@@ -166,18 +177,53 @@ function calculateRequestNaturality(requests: any[]): number {
   // Too many requests in a short time is suspicious
   const suspiciousCount = requests.length > 5 ? 0 : 3;
   
-  // Add some randomness 
-  return suspiciousCount + (Math.random() * 2);
+  // Analysis of request timing patterns
+  let suspiciousTiming = 0;
+  if (requests.length > 1) {
+    const timeDiffs = [];
+    for (let i = 1; i < requests.length; i++) {
+      timeDiffs.push(requests[i].timestamp - requests[i-1].timestamp);
+    }
+    
+    // Very consistent timing is suspicious
+    const mean = timeDiffs.reduce((sum, time) => sum + time, 0) / timeDiffs.length;
+    const consistent = timeDiffs.filter(diff => Math.abs(diff - mean) < 50).length;
+    
+    if (consistent / timeDiffs.length > 0.7) {
+      suspiciousTiming = 2;
+    }
+  }
+  
+  return Math.max(0, suspiciousCount - suspiciousTiming);
 }
 
 function calculateTimeNaturality(activities: any[]): number {
-  // For the demo, we'll use the overall variety of activities
+  // For the demo, we'll use the overall variety of activities and their timing
   
   // Count different types of activities
   const types = new Set(activities.map(a => a.type));
   
   // More variety indicates more natural behavior
-  return Math.min(5, types.size);
+  const varietyScore = Math.min(5, types.size);
+  
+  // Check for suspiciously regular timing
+  let timingScore = 0;
+  if (activities.length > 5) {
+    const timeDiffs = [];
+    for (let i = 1; i < activities.length; i++) {
+      timeDiffs.push(activities[i].timestamp - activities[i-1].timestamp);
+    }
+    
+    // Calculate standard deviation of time differences
+    const mean = timeDiffs.reduce((sum, time) => sum + time, 0) / timeDiffs.length;
+    const variance = timeDiffs.reduce((sum, time) => sum + Math.pow(time - mean, 2), 0) / timeDiffs.length;
+    const stdDev = Math.sqrt(variance);
+    
+    // Lower stdDev means more consistent timing (suspicious)
+    timingScore = Math.min(3, stdDev / 200);
+  }
+  
+  return varietyScore + timingScore;
 }
 
 // Determine the type of bot based on behavior patterns
@@ -187,19 +233,19 @@ export const detectBotType = (score: BotScore): BotType | null => {
   }
   
   // Determine bot type based on scores
-  if (score.requestPattern > 70) {
+  if (score.requestPattern > 60) { // Lowered from 70 to 60
     return 'scraper';
   }
   
-  if (score.navigationPattern > 70 && score.timePattern > 60) {
+  if (score.navigationPattern > 65 && score.timePattern > 55) { // Lowered thresholds
     return 'crawler';
   }
   
-  if (score.keyboardPattern > 80) {
+  if (score.keyboardPattern > 70) { // Lowered from 80 to 70
     return 'spamBot';
   }
   
-  if (score.total > 70) {
+  if (score.total > 65) { // Lowered from 70 to 65
     return 'chatBot';
   }
   
