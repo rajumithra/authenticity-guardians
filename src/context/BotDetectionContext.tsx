@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect, useContext, ReactNode } from
 import { v4 as uuidv4 } from 'uuid';
 import { UserSession, BotScore, UserActivity, BlockedBot, LogEntry, BotType } from '../models/BotDetectionTypes';
 import { detectBotType, analyzeUserBehavior } from '../utils/botDetection';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 interface BotDetectionContextType {
   currentSession: UserSession | null;
@@ -270,9 +270,8 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
           
           // If the score is high enough, block immediately for aggressive scraping
           if (rapidUpdatedScore.total > BOT_SCORE_THRESHOLD - 10 || rapidUpdatedScore.requestPattern > 70) { // Lowered from 80 to 70
-            setTimeout(() => {
-              blockBot(FIXED_SESSION_ID, `Aggressive scraping detected`);
-            }, 0); // Changed from 200ms to 0 for immediate blocking
+            // Use direct call instead of setTimeout to ensure immediate blocking
+            blockBot(FIXED_SESSION_ID, `Aggressive scraping detected`);
           }
         }
       }
@@ -303,61 +302,57 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const blockBot = (sessionId: string, reason: string) => {
     if (!currentSession) return;
-
     if (isBlocked) return; // Prevent multiple blocks
 
     // Set blocked state immediately
     setIsBlocked(true);
     
-    // Update session state to reflect blocked status - CRITICAL FIX
+    // FIXED - Create the blocked bot entry before updating state
+    const blockedBot: BlockedBot = {
+      sessionId,
+      ip: currentSession.ip,
+      userAgent: currentSession.userAgent,
+      botScore: currentSession.botScore,
+      botType: (currentSession.botType || detectBotType(currentSession.botScore)) as BotType,
+      timeBlocked: Date.now(),
+      reason
+    };
+    
+    // CRITICAL FIX: Update session state first with a direct update, not inside setTimeout
     setCurrentSession(prevSession => {
       if (!prevSession) return null;
       
-      // Make sure to update the session with blocked status
-      const updatedSession = {
+      return {
         ...prevSession,
         isBlocked: true,
-        // Ensure the botType is set when blocking
         botType: prevSession.botType || detectBotType(prevSession.botScore)
       };
-      
-      // Add to blocked bots list
-      const blockedBot: BlockedBot = {
-        sessionId,
-        ip: updatedSession.ip,
-        userAgent: updatedSession.userAgent,
-        botScore: updatedSession.botScore,
-        botType: (updatedSession.botType || 'unknown') as BotType,
-        timeBlocked: Date.now(),
-        reason
-      };
-      
-      // Update blocked bots in next tick to avoid state conflicts
-      setTimeout(() => {
-        setBlockedBots(prev => {
-          // Check if already blocked to prevent duplicates
-          if (prev.some(bot => bot.sessionId === sessionId)) {
-            return prev;
-          }
-          return [...prev, blockedBot];
-        });
-        
-        addLog('warning', `Bot blocked: ${sessionId}`, {
-          reason,
-          botScore: updatedSession.botScore
-        });
-      }, 0);
-      
-      // Show toast notification
+    });
+    
+    // Then update blocked bots list
+    setBlockedBots(prev => {
+      // Check if already blocked to prevent duplicates
+      if (prev.some(bot => bot.sessionId === sessionId)) {
+        return prev;
+      }
+      return [...prev, blockedBot];
+    });
+    
+    // Add log entry
+    addLog('warning', `Bot blocked: ${sessionId}`, {
+      reason,
+      botScore: currentSession.botScore
+    });
+    
+    // Show toast notification outside of state updates
+    setTimeout(() => {
       toast({
         title: "Bot Activity Detected!",
         description: `A bot has been blocked. Reason: ${reason}`,
         variant: "destructive",
         duration: 5000,
       });
-      
-      return updatedSession;
-    });
+    }, 0);
   };
 
   const resetSession = () => {
