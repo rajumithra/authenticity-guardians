@@ -59,7 +59,7 @@ const FIXED_IP = '192.168.1.101';
 const FIXED_SESSION_ID = '92a7f632-c8f2-45bc-b10a-3f36b51c8751';
 
 // Bot detection thresholds - LOWERED
-const BOT_SCORE_THRESHOLD = 60; // Lowered from 70 to 60
+const BOT_SCORE_THRESHOLD = 60;
 
 export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentSession, setCurrentSession] = useState<UserSession | null>(null);
@@ -69,6 +69,8 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [isBlocked, setIsBlocked] = useState(false);
   const [mouseMovementCount, setMouseMovementCount] = useState(0);
   const [recentApiRequests, setRecentApiRequests] = useState<number>(0);
+  const [humanScore, setHumanScore] = useState(60); // Initial human score
+  const [securityScore, setSecurityScore] = useState(70); // Initial security score
 
   // Initialize session
   useEffect(() => {
@@ -154,13 +156,13 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
         const shouldBlock = updatedScore.total > BOT_SCORE_THRESHOLD;
 
         // If rapid API requests detected in a short time, increase the score even more
-        if (recentApiRequests > 3) { // Reduced threshold from 5 to 3
-          updatedScore.requestPattern = Math.min(100, updatedScore.requestPattern + 15); // Increased from 10 to 15
+        if (recentApiRequests > 3) {
+          updatedScore.requestPattern = Math.min(100, updatedScore.requestPattern + 15);
           updatedScore.total = Math.round(
-            (updatedScore.mouseMovement * 0.15) + // Decreased from 0.20 to 0.15
-            (updatedScore.keyboardPattern * 0.15) + // Decreased from 0.20 to 0.15
-            (updatedScore.navigationPattern * 0.15) + // Kept the same
-            (updatedScore.requestPattern * 0.45) + // Increased weight from 0.35 to 0.45
+            (updatedScore.mouseMovement * 0.15) +
+            (updatedScore.keyboardPattern * 0.15) +
+            (updatedScore.navigationPattern * 0.15) +
+            (updatedScore.requestPattern * 0.45) +
             (updatedScore.timePattern * 0.10)
           );
         }
@@ -172,6 +174,19 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
           }, 0);
         }
 
+        // Update human and security scores inversely to bot score
+        // Higher bot score = lower human score and security score
+        setHumanScore(Math.max(0, 100 - updatedScore.total));
+        setSecurityScore(prevSecurityScore => {
+          // Gradually adjust security score based on bot score
+          if (updatedScore.total > 50) {
+            return Math.max(0, prevSecurityScore - 2);
+          } else if (updatedScore.total < 30) {
+            return Math.min(100, prevSecurityScore + 1);
+          }
+          return prevSecurityScore;
+        });
+
         return {
           ...prevSession,
           botScore: updatedScore,
@@ -182,7 +197,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
       // Reset recent API requests counter
       setRecentApiRequests(0);
-    }, 800); // Reduced from 1000ms to 800ms for more frequent updates
+    }, 800);
 
     return () => clearInterval(updateInterval);
   }, [currentSession, recentApiRequests]);
@@ -204,6 +219,8 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     setCurrentSession(newSession);
     setIsBlocked(false);
+    setHumanScore(60); // Reset human score
+    setSecurityScore(70); // Reset security score
     addLog('info', `New session started: ${FIXED_SESSION_ID}`);
   };
 
@@ -218,6 +235,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
     // Update current session with new activity
     setCurrentSession(prevSession => {
       if (!prevSession) return null;
+      if (prevSession.isBlocked) return prevSession; // Don't update if blocked
       
       // Keep a limited number of activities to avoid memory issues
       const updatedActivities = [...prevSession.activities, newActivity];
@@ -237,13 +255,11 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
           requestData.action === 'rapid-scrape' || 
           requestData.action === 'repetitive-access' ||
           (requestData.url && typeof requestData.url === 'string' && 
-           (requestData.url.includes('kitsguntur.ac.in') || 
-            requestData.url.includes('www.') || 
-            requestData.url.startsWith('http')));
+           (requestData.url.includes('kitsguntur.ac.in')));
             
         if (isScraping) {
           // Much more aggressive scoring for detected scraping
-          rapidUpdatedScore.requestPattern = Math.min(100, rapidUpdatedScore.requestPattern + 15); // Increased from 8 to 15
+          rapidUpdatedScore.requestPattern = Math.min(100, rapidUpdatedScore.requestPattern + 15);
           
           // If aggressive scraping detected, immediately elevate the score 
           if (requestData.action === 'rapid-scrape' || 
@@ -253,7 +269,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
                  a.type === 'apiRequest' && 
                  a.timestamp > Date.now() - 5000
                ).length > 5)) {
-            rapidUpdatedScore.requestPattern = Math.min(100, rapidUpdatedScore.requestPattern + 25); // Increased from 15 to 25
+            rapidUpdatedScore.requestPattern = Math.min(100, rapidUpdatedScore.requestPattern + 25);
           }
           
           // Recalculate the total score with more weight on the request pattern
@@ -269,9 +285,16 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
           addLog('warning', `Potential scraping detected: ${requestData.url || 'API request'}`, requestData);
           
           // If the score is high enough, block immediately for aggressive scraping
-          if (rapidUpdatedScore.total > BOT_SCORE_THRESHOLD - 10 || rapidUpdatedScore.requestPattern > 70) { // Lowered from 80 to 70
+          if (rapidUpdatedScore.total > BOT_SCORE_THRESHOLD - 10 || rapidUpdatedScore.requestPattern > 70) {
             // Use direct call instead of setTimeout to ensure immediate blocking
             blockBot(FIXED_SESSION_ID, `Aggressive scraping detected`);
+            return {
+              ...prevSession,
+              activities: limitedActivities,
+              lastActive: Date.now(),
+              botScore: rapidUpdatedScore,
+              isBlocked: true
+            };
           }
         }
       }
@@ -292,11 +315,18 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
       if (activity.data.action === 'scrape' || activity.data.action === 'rapid-scrape') {
         addLog('warning', `Scraping detected: ${activity.data.url || 'Unknown URL'}`, activity.data);
       } else if (activity.data.url && typeof activity.data.url === 'string' && 
-                (activity.data.url.includes('kitsguntur.ac.in') || 
-                 activity.data.url.includes('www.') || 
-                 activity.data.url.startsWith('http'))) {
-        addLog('warning', `Website scraping attempted: ${activity.data.url}`, activity.data);
+                (activity.data.url.includes('kitsguntur.ac.in'))) {
+        addLog('warning', `Restricted website scraping attempted: ${activity.data.url}`, activity.data);
       }
+    }
+
+    // Update human score based on activity type
+    if (activity.type === 'mouseMove' || activity.type === 'keyPress' || activity.type === 'mouseClick') {
+      // Natural user activities increase human score
+      setHumanScore(prev => Math.min(100, prev + 0.5));
+    } else if (activity.type === 'apiRequest') {
+      // API requests may decrease human score
+      setHumanScore(prev => Math.max(0, prev - 1));
     }
   };
 
@@ -307,7 +337,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
     // Set blocked state immediately
     setIsBlocked(true);
     
-    // FIXED - Create the blocked bot entry before updating state
+    // Create the blocked bot entry before updating state
     const blockedBot: BlockedBot = {
       sessionId,
       ip: currentSession.ip,
@@ -318,7 +348,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
       reason
     };
     
-    // CRITICAL FIX: Update session state first with a direct update, not inside setTimeout
+    // Update session state first with a direct update
     setCurrentSession(prevSession => {
       if (!prevSession) return null;
       
@@ -343,6 +373,9 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
       reason,
       botScore: currentSession.botScore
     });
+    
+    // Update security score when a bot is blocked
+    setSecurityScore(prev => Math.max(0, prev - 15));
     
     // Show toast notification outside of state updates
     setTimeout(() => {

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cva } from 'class-variance-authority';
@@ -37,19 +37,45 @@ const scoreColors = cva('', {
 });
 
 export const ScoreCard: React.FC<ScoreCardProps> = ({ title, score, type, icon }) => {
+  const [displayScore, setDisplayScore] = useState(score);
+  const [previousScore, setPreviousScore] = useState(score);
+  
+  // Animate score changes for a smoother UI experience
+  useEffect(() => {
+    if (score !== previousScore) {
+      setPreviousScore(score);
+      
+      // Gradually animate to new score
+      const interval = setInterval(() => {
+        setDisplayScore(current => {
+          if (current < score) {
+            return Math.min(current + 1, score);
+          } else if (current > score) {
+            return Math.max(current - 1, score);
+          } else {
+            clearInterval(interval);
+            return current;
+          }
+        });
+      }, 20);
+      
+      return () => clearInterval(interval);
+    }
+  }, [score, previousScore]);
+  
   // Get appropriate color range based on score and type
   const getColorClass = () => {
     let index;
     
     if (type === 'bot') {
       // For bot score, high is bad
-      if (score >= 70) index = 0;
-      else if (score >= 30) index = 1;
+      if (displayScore >= 70) index = 0;
+      else if (displayScore >= 30) index = 1;
       else index = 2;
     } else {
       // For human and security scores, high is good
-      if (score >= 70) index = 0;
-      else if (score >= 30) index = 1;
+      if (displayScore >= 70) index = 0;
+      else if (displayScore >= 30) index = 1;
       else index = 2;
     }
     
@@ -57,25 +83,25 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ title, score, type, icon }
   };
 
   return (
-    <Card className="border border-cyber-primary/30 shadow-lg bg-white/5 backdrop-blur-sm">
+    <Card className="border border-cyber-primary/30 shadow-lg bg-white/5 backdrop-blur-sm transition-all duration-300">
       <CardContent className="p-4">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center">
             {icon}
             <h3 className="text-sm font-medium ml-2">{title}</h3>
           </div>
-          <div className="text-2xl font-bold">{score}</div>
+          <div className="text-2xl font-bold">{Math.round(displayScore)}</div>
         </div>
         
         <div className="relative pt-1">
           <Progress 
-            value={score} 
+            value={displayScore} 
             max={100}
             className="h-2 rounded-full overflow-hidden" 
           />
           <div 
-            className={`absolute inset-0 bg-gradient-to-r ${getColorClass()} opacity-80 h-2 rounded-full`}
-            style={{ width: `${score}%` }}
+            className={`absolute inset-0 bg-gradient-to-r ${getColorClass()} opacity-80 h-2 rounded-full transition-all duration-300`}
+            style={{ width: `${displayScore}%` }}
           ></div>
         </div>
         

@@ -24,33 +24,33 @@ interface SampleWebsite {
 const sampleWebsites: SampleWebsite[] = [
   {
     id: '1',
-    url: 'https://www.kitsguntur.ac.in/',
-    title: 'KITS Guntur College',
-    content: 'KITS Guntur is an autonomous institution affiliated with Acharya Nagarjuna University. It offers undergraduate and postgraduate programs in Engineering, Management, and Computer Applications. The college has state-of-the-art facilities and experienced faculty. Established in 1998, it has been ranked among the top engineering colleges in the region.'
+    url: 'https://www.vvitguntur.com/',
+    title: 'VVIT Guntur College',
+    content: 'VVIT Guntur (Vasireddy Venkatadri Institute of Technology) is a premier engineering college located in Guntur, Andhra Pradesh. The college offers undergraduate and postgraduate programs in various engineering disciplines. With state-of-the-art infrastructure and experienced faculty, VVIT focuses on providing quality technical education and promoting research activities.'
   },
   {
     id: '2',
-    url: 'https://www.kitsguntur.ac.in/courses',
-    title: 'KITS Guntur - Available Courses',
-    content: 'KITS Guntur offers various courses including B.Tech in Computer Science, Electronics & Communication, Electrical & Electronics, Mechanical, Civil, and Information Technology. The college also offers M.Tech, MCA, and MBA programs. The curriculum is industry-oriented with focus on practical learning and skill development.'
+    url: 'https://www.vvitguntur.com/courses',
+    title: 'VVIT Guntur - Available Courses',
+    content: 'VVIT Guntur offers various undergraduate programs including B.Tech in Computer Science and Engineering, Electronics and Communication Engineering, Electrical and Electronics Engineering, Mechanical Engineering, Civil Engineering, and Information Technology. The college also offers postgraduate programs like M.Tech in different specializations. The curriculum is designed to meet industry requirements.'
   },
   {
     id: '3',
-    url: 'https://www.kitsguntur.ac.in/faculty',
-    title: 'KITS Guntur - Faculty Information',
-    content: 'KITS Guntur has a team of highly qualified faculty members with PhD degrees and industry experience. The faculty regularly publishes research papers in international journals and attends conferences. The student-to-faculty ratio is maintained at 15:1 to ensure personalized attention to students.'
+    url: 'https://rvrjcce.ac.in/',
+    title: 'RVRJC College of Engineering',
+    content: 'RVR & JC College of Engineering (RVRJCCE) is an autonomous institution established in 1985, located in Guntur, Andhra Pradesh. Affiliated to Acharya Nagarjuna University, the college offers undergraduate, postgraduate, and doctoral programs in engineering and management. The college has been accredited by NBA and maintains high academic standards.'
   },
   {
     id: '4',
-    url: 'https://www.kitsguntur.ac.in/facilities',
-    title: 'KITS Guntur - Campus Facilities',
-    content: 'KITS Guntur campus is spread over 13 acres with modern infrastructure including well-equipped laboratories, a central library with over 50,000 books, digital learning resources, sports facilities, seminar halls, and hostels for boys and girls. The campus has Wi-Fi connectivity and 24/7 power backup.'
+    url: 'https://rvrjcce.ac.in/facilities',
+    title: 'RVRJCCE - Campus Facilities',
+    content: 'RVR & JC College of Engineering has excellent infrastructure including well-equipped laboratories, central library with a vast collection of books and journals, computing facilities, sports complex, and separate hostels for boys and girls. The campus is spread over 37 acres with green landscapes and modern amenities.'
   },
   {
     id: '5',
-    url: 'https://www.kitsguntur.ac.in/admissions',
-    title: 'KITS Guntur - Admission Process',
-    content: 'Admissions to KITS Guntur are based on merit in entrance examinations like EAMCET for undergraduate courses and PGCET/ICET for postgraduate courses. The college also offers scholarships to meritorious students and those from economically weaker sections. The academic year typically starts in July/August.'
+    url: 'https://rvrjcce.ac.in/admissions',
+    title: 'RVRJCCE - Admission Process',
+    content: 'Admissions to undergraduate programs at RVR & JC College of Engineering are based on the rank obtained in AP EAMCET. For postgraduate programs, admissions are based on the rank in GATE/PGECET. The college also offers scholarships to meritorious students and those from economically weaker sections to support their education.'
   }
 ];
 
@@ -59,7 +59,7 @@ export const ChatBot: React.FC = () => {
     {
       id: '1',
       sender: 'bot',
-      text: 'Hello! I am an AI assistant for KITS Guntur College. Ask me anything about the college, courses, faculty, facilities, or admission process.',
+      text: 'Hello! I am an AI assistant for college information. Ask me anything about VVIT Guntur or RVRJC College of Engineering.',
       timestamp: new Date()
     }
   ]);
@@ -91,9 +91,9 @@ export const ChatBot: React.FC = () => {
   useEffect(() => {
     // Reduced thresholds for faster detection
     const thresholds = {
-      slow: 6, // Reduced from 8 to 6
-      normal: 4, // Reduced from 6 to 4
-      aggressive: 3  // Reduced from 4 to 3
+      slow: 6, 
+      normal: 4, 
+      aggressive: 3  
     };
     
     if (requestCount > thresholds[crawlRate as keyof typeof thresholds]) {
@@ -117,11 +117,11 @@ export const ChatBot: React.FC = () => {
     
     if (autoModeActive && !isBlocked && crawlRate === 'aggressive') {
       const followUpQuestions = [
-        'Tell me more about the faculty at KITS Guntur',
-        'What courses are offered at KITS Guntur?',
-        'Show me information about the campus facilities',
-        'What are the admission requirements for KITS Guntur?',
-        'Tell me about the college history'
+        'Tell me more about the faculty at VVIT Guntur',
+        'What courses are offered at RVRJCCE?',
+        'Show me information about the campus facilities at VVIT',
+        'What are the admission requirements for RVRJCCE?',
+        'Tell me about the college history of VVIT'
       ];
       
       autoModeInterval = setInterval(() => {
@@ -132,7 +132,7 @@ export const ChatBot: React.FC = () => {
         } else {
           if (autoModeInterval) clearInterval(autoModeInterval);
         }
-      }, 2000); // Reduced from 3000 to 2000ms for more frequent requests
+      }, 2000);
     }
     
     return () => {
@@ -158,7 +158,7 @@ export const ChatBot: React.FC = () => {
         data: { message: input, type: 'suspiciousRapidFire' }
       });
       
-      setRequestCount(prev => prev + 3); // Increased from 2 to 3
+      setRequestCount(prev => prev + 3);
       return;
     }
     
@@ -170,7 +170,8 @@ export const ChatBot: React.FC = () => {
       data: { 
         message: input, 
         type: 'chatRequest',
-        url: input.includes('KITS') ? 'https://www.kitsguntur.ac.in/search' : null
+        url: input.includes('VVIT') ? 'https://www.vvitguntur.com/search' : 
+             input.includes('RVR') ? 'https://rvrjcce.ac.in/search' : null
       }
     });
     
@@ -188,11 +189,11 @@ export const ChatBot: React.FC = () => {
     
     // Special behavior for aggressive mode - simulate more intensive scraping
     if (crawlRate === 'aggressive') {
-      for (let i = 0; i < 5; i++) { // Increased from 3 to 5
+      for (let i = 0; i < 5; i++) {
         recordActivity({
           type: 'apiRequest',
           data: { 
-            url: `https://www.kitsguntur.ac.in/page${i}`, 
+            url: `https://www.vvitguntur.com/page${i}`, 
             action: 'rapid-scrape', 
             timestamp: Date.now() + i * 100 
           }
@@ -202,7 +203,7 @@ export const ChatBot: React.FC = () => {
     
     setRequestCount(prev => prev + 1);
     
-    const botTypingTime = crawlRate === 'aggressive' ? 300 : crawlRate === 'normal' ? 800 : 1500; // Reduced times
+    const botTypingTime = crawlRate === 'aggressive' ? 300 : crawlRate === 'normal' ? 800 : 1500;
     
     setTimeout(() => {
       if (isBlocked) {
@@ -217,7 +218,7 @@ export const ChatBot: React.FC = () => {
         data: { 
           responseType: 'chatResponse', 
           crawlRate, 
-          targetSite: 'https://www.kitsguntur.ac.in/',
+          targetSite: currentInput.includes('VVIT') ? 'https://www.vvitguntur.com/' : 'https://rvrjcce.ac.in/',
           timeToRespond: botTypingTime
         }
       });
@@ -243,6 +244,9 @@ export const ChatBot: React.FC = () => {
     // Enhanced scraping simulation - record more intensive API requests
     // This is a key part of the scraping behavior that should trigger detection
     for (const website of sampleWebsites) {
+      // Skip any KITS Guntur URLs
+      if (website.url.includes('kitsguntur.ac.in')) continue;
+      
       recordActivity({
         type: 'apiRequest',
         data: { 
@@ -256,31 +260,31 @@ export const ChatBot: React.FC = () => {
     
     // In aggressive mode, simulate even more intensive scraping
     if (crawlRate === 'aggressive') {
-      for (let i = 0; i < 8; i++) { // Increased from 5 to 8
+      for (let i = 0; i < 8; i++) {
         recordActivity({
           type: 'apiRequest',
           data: { 
-            url: 'https://www.kitsguntur.ac.in/multiple-urls', 
+            url: i % 2 === 0 ? 'https://www.vvitguntur.com/multiple-urls' : 'https://rvrjcce.ac.in/multiple-urls', 
             action: 'rapid-scrape',
-            timestamp: Date.now() + i * 50 // Added timestamps with short intervals
+            timestamp: Date.now() + i * 50
           }
         });
       }
       
       // Also simulate bot-like keyboard activity (very consistent timing)
-      for (let i = 0; i < 5; i++) { // Increased from 3 to 5
+      for (let i = 0; i < 5; i++) {
         recordActivity({
           type: 'keyPress',
-          data: { key: 'a', timeStamp: Date.now() + i * 10 } // More consistent timing
+          data: { key: 'a', timeStamp: Date.now() + i * 10 }
         });
       }
     } else if (crawlRate === 'normal') {
       // Normal mode does moderate scraping
-      for (let i = 0; i < 3; i++) { // Added loop
+      for (let i = 0; i < 3; i++) {
         recordActivity({
           type: 'apiRequest',
           data: { 
-            url: 'https://www.kitsguntur.ac.in/search', 
+            url: i % 2 === 0 ? 'https://www.vvitguntur.com/search' : 'https://rvrjcce.ac.in/search', 
             action: crawlRate === 'normal' ? 'search' : 'scrape'
           }
         });
@@ -288,15 +292,29 @@ export const ChatBot: React.FC = () => {
     }
     
     // Match query to relevant data from "scraped" websites
+    if (queryLower.includes('vvit') || queryLower.includes('vasireddy')) {
+      if (queryLower.includes('course') || queryLower.includes('program') || queryLower.includes('degree')) {
+        return `Based on information from ${sampleWebsites[1].url}: ${sampleWebsites[1].content}`;
+      } else {
+        return `From ${sampleWebsites[0].url}: ${sampleWebsites[0].content}`;
+      }
+    }
+    
+    if (queryLower.includes('rvr') || queryLower.includes('rvrjc') || queryLower.includes('rvrjcce')) {
+      if (queryLower.includes('facilit') || queryLower.includes('campus') || queryLower.includes('infrastructure')) {
+        return `According to ${sampleWebsites[3].url}: ${sampleWebsites[3].content}`;
+      } else if (queryLower.includes('admission') || queryLower.includes('apply')) {
+        return `As per ${sampleWebsites[4].url}: ${sampleWebsites[4].content}`;
+      } else {
+        return `From ${sampleWebsites[2].url}: ${sampleWebsites[2].content}`;
+      }
+    }
+    
     if (queryLower.includes('course') || queryLower.includes('program') || queryLower.includes('degree') || queryLower.includes('btech') || queryLower.includes('mtech')) {
       return `Based on information from ${sampleWebsites[1].url}: ${sampleWebsites[1].content}`;
     }
     
-    if (queryLower.includes('faculty') || queryLower.includes('professor') || queryLower.includes('teacher') || queryLower.includes('staff')) {
-      return `According to ${sampleWebsites[2].url}: ${sampleWebsites[2].content}`;
-    }
-    
-    if (queryLower.includes('campus') || queryLower.includes('facilit') || queryLower.includes('lab') || queryLower.includes('hostel') || queryLower.includes('library')) {
+    if (queryLower.includes('facilit') || queryLower.includes('campus') || queryLower.includes('lab') || queryLower.includes('hostel') || queryLower.includes('library')) {
       return `From ${sampleWebsites[3].url}: ${sampleWebsites[3].content}`;
     }
     
@@ -304,12 +322,15 @@ export const ChatBot: React.FC = () => {
       return `As per ${sampleWebsites[4].url}: ${sampleWebsites[4].content}`;
     }
     
-    if (queryLower.includes('college') || queryLower.includes('kits') || queryLower.includes('about') || queryLower.includes('guntur')) {
-      return `From ${sampleWebsites[0].url}: ${sampleWebsites[0].content}`;
+    if (queryLower.includes('kits') || queryLower.includes('guntur college')) {
+      return `I'm sorry, I don't have specific information about KITS Guntur. However, I can provide information about VVIT Guntur or RVRJCCE. Would you like to know about either of these colleges?`;
     }
     
-    // For unmatched queries, return random information 
-    const randomSite = sampleWebsites[Math.floor(Math.random() * sampleWebsites.length)];
+    // For unmatched queries, return information from VVIT or RVRJCCE
+    const relevantSites = sampleWebsites.filter(site => 
+      !site.url.includes('kitsguntur.ac.in')
+    );
+    const randomSite = relevantSites[Math.floor(Math.random() * relevantSites.length)];
     return `I searched and found this information from ${randomSite.url}: ${randomSite.content}`;
   };
 
@@ -323,11 +344,11 @@ export const ChatBot: React.FC = () => {
     
     if (rate === 'aggressive') {
       // Simulate even more aggressive behavior immediately when switching to this mode
-      for (let i = 0; i < 5; i++) { // Increased from 3 to 5
+      for (let i = 0; i < 5; i++) {
         recordActivity({
           type: 'apiRequest',
           data: { 
-            url: 'https://www.kitsguntur.ac.in/', 
+            url: i % 2 === 0 ? 'https://www.vvitguntur.com/' : 'https://rvrjcce.ac.in/',
             action: 'repetitive-access',
             timestamp: Date.now() + i * 100
           }
@@ -346,7 +367,7 @@ export const ChatBot: React.FC = () => {
         <div className="flex items-center justify-between">
           <CardTitle className="text-white flex items-center">
             <Bot className="mr-2" size={20} />
-            KITS Guntur Scraper Bot
+            ChatBot
           </CardTitle>
           <div className="flex items-center space-x-2">
             <Badge 
@@ -450,7 +471,7 @@ export const ChatBot: React.FC = () => {
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isBlocked ? "Bot has been blocked" : "Ask about KITS Guntur..."}
+            placeholder={isBlocked ? "Bot has been blocked" : "Ask about VVIT or RVRJCCE..."}
             disabled={isBlocked || isTyping}
             className="flex-grow bg-white/20 backdrop-blur-sm text-white placeholder:text-gray-300 border-cyber-primary/30"
           />

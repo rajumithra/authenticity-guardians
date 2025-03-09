@@ -72,3 +72,16 @@ export interface LogEntry {
   message: string;
   data?: any;
 }
+
+export interface SecurityStatus {
+  level: 'low' | 'medium' | 'high';
+  score: number;
+  lastUpdated: number;
+  activeThreats: number;
+}
+
+export interface HumanScore {
+  value: number;
+  confidence: number;
+  lastUpdated: number;
+}
