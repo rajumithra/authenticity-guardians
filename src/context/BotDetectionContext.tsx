@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { UserSession, BotScore, UserActivity, BlockedBot, LogEntry, BotType } from '../models/BotDetectionTypes';
@@ -59,8 +58,8 @@ const FIXED_IP = '192.168.1.101';
 // Create a fixed session ID to prevent changing
 const FIXED_SESSION_ID = '92a7f632-c8f2-45bc-b10a-3f36b51c8751';
 
-// Bot detection thresholds
-const BOT_SCORE_THRESHOLD = 70; // Lowered from 75 to 70
+// Bot detection thresholds - LOWERED
+const BOT_SCORE_THRESHOLD = 60; // Lowered from 70 to 60
 
 export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentSession, setCurrentSession] = useState<UserSession | null>(null);
@@ -139,7 +138,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
     };
   }, [currentSession]);
 
-  // Update bot score every second based on activity
+  // Update bot score more frequently for faster detection
   useEffect(() => {
     if (!currentSession || currentSession.isBlocked) return;
 
@@ -154,14 +153,14 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
         const botType = detectBotType(updatedScore);
         const shouldBlock = updatedScore.total > BOT_SCORE_THRESHOLD;
 
-        // If rapid API requests detected in a short time, increase the score
-        if (recentApiRequests > 5) {
-          updatedScore.requestPattern = Math.min(100, updatedScore.requestPattern + 10);
+        // If rapid API requests detected in a short time, increase the score even more
+        if (recentApiRequests > 3) { // Reduced threshold from 5 to 3
+          updatedScore.requestPattern = Math.min(100, updatedScore.requestPattern + 15); // Increased from 10 to 15
           updatedScore.total = Math.round(
-            (updatedScore.mouseMovement * 0.20) +
-            (updatedScore.keyboardPattern * 0.20) +
-            (updatedScore.navigationPattern * 0.15) +
-            (updatedScore.requestPattern * 0.35) +
+            (updatedScore.mouseMovement * 0.15) + // Decreased from 0.20 to 0.15
+            (updatedScore.keyboardPattern * 0.15) + // Decreased from 0.20 to 0.15
+            (updatedScore.navigationPattern * 0.15) + // Kept the same
+            (updatedScore.requestPattern * 0.45) + // Increased weight from 0.35 to 0.45
             (updatedScore.timePattern * 0.10)
           );
         }
@@ -180,7 +179,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
       // Reset recent API requests counter
       setRecentApiRequests(0);
-    }, 1000);
+    }, 800); // Reduced from 1000ms to 800ms for more frequent updates
 
     return () => clearInterval(updateInterval);
   }, [currentSession, recentApiRequests]);
@@ -229,21 +228,37 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
         // Track API requests for short-term burst detection
         setRecentApiRequests(prev => prev + 1);
         
-        // Check for bot-like behavior in API requests
-        if (requestData.action === 'scrape' || requestData.action === 'rapid-scrape') {
-          rapidUpdatedScore.requestPattern = Math.min(100, rapidUpdatedScore.requestPattern + 8); // Increased from 5 to 8
+        // Enhanced detection for website scraping
+        const isScraping = 
+          requestData.action === 'scrape' || 
+          requestData.action === 'rapid-scrape' || 
+          requestData.action === 'repetitive-access' ||
+          (requestData.url && typeof requestData.url === 'string' && 
+           (requestData.url.includes('kitsguntur.ac.in') || 
+            requestData.url.includes('www.') || 
+            requestData.url.startsWith('http')));
+            
+        if (isScraping) {
+          // Much more aggressive scoring for detected scraping
+          rapidUpdatedScore.requestPattern = Math.min(100, rapidUpdatedScore.requestPattern + 15); // Increased from 8 to 15
           
-          // If scraping detected, immediately elevate the score 
-          if (requestData.action === 'rapid-scrape') {
-            rapidUpdatedScore.requestPattern = Math.min(100, rapidUpdatedScore.requestPattern + 15);
+          // If aggressive scraping detected, immediately elevate the score 
+          if (requestData.action === 'rapid-scrape' || 
+              requestData.type === 'suspiciousRapidFire' ||
+              (Array.isArray(limitedActivities) && 
+               limitedActivities.filter(a => 
+                 a.type === 'apiRequest' && 
+                 a.timestamp > Date.now() - 5000
+               ).length > 5)) {
+            rapidUpdatedScore.requestPattern = Math.min(100, rapidUpdatedScore.requestPattern + 25); // Increased from 15 to 25
           }
           
           // Recalculate the total score with more weight on the request pattern
           rapidUpdatedScore.total = Math.round(
-            (rapidUpdatedScore.mouseMovement * 0.20) +
-            (rapidUpdatedScore.keyboardPattern * 0.20) +
-            (rapidUpdatedScore.navigationPattern * 0.15) +
-            (rapidUpdatedScore.requestPattern * 0.35) + // Increased weight
+            (rapidUpdatedScore.mouseMovement * 0.15) + 
+            (rapidUpdatedScore.keyboardPattern * 0.15) + 
+            (rapidUpdatedScore.navigationPattern * 0.15) + 
+            (rapidUpdatedScore.requestPattern * 0.45) + 
             (rapidUpdatedScore.timePattern * 0.10)
           );
           
@@ -251,10 +266,10 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
           addLog('warning', `Potential scraping detected: ${requestData.url || 'API request'}`, requestData);
           
           // If the score is high enough, block immediately for aggressive scraping
-          if (rapidUpdatedScore.total > BOT_SCORE_THRESHOLD || rapidUpdatedScore.requestPattern > 80) {
+          if (rapidUpdatedScore.total > BOT_SCORE_THRESHOLD - 10 || rapidUpdatedScore.requestPattern > 70) { // Lowered from 80 to 70
             setTimeout(() => {
               blockBot(FIXED_SESSION_ID, `Aggressive scraping detected`);
-            }, 500);
+            }, 200); // Reduced from 500 to 200ms for faster blocking
           }
         }
       }
@@ -270,11 +285,14 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
     // Add to activity history for display
     setActivityHistory(prev => [...prev, newActivity].slice(-50)); // Keep last 50 for display
 
-    // Log specific activities
+    // Enhanced logging for better debugging
     if (activity.type === 'apiRequest') {
-      if (activity.data.action === 'scrape') {
-        addLog('warning', `Scraping detected: ${activity.data.url}`, activity.data);
-      } else if (activity.data.url && typeof activity.data.url === 'string' && activity.data.url.includes('kitsguntur.ac.in')) {
+      if (activity.data.action === 'scrape' || activity.data.action === 'rapid-scrape') {
+        addLog('warning', `Scraping detected: ${activity.data.url || 'Unknown URL'}`, activity.data);
+      } else if (activity.data.url && typeof activity.data.url === 'string' && 
+                (activity.data.url.includes('kitsguntur.ac.in') || 
+                 activity.data.url.includes('www.') || 
+                 activity.data.url.startsWith('http'))) {
         addLog('warning', `Website scraping attempted: ${activity.data.url}`, activity.data);
       }
     }

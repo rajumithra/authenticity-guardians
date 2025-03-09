@@ -89,10 +89,11 @@ export const ChatBot: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Reduced thresholds for faster detection
     const thresholds = {
-      slow: 8, // Reduced from 10 to 8
-      normal: 6, // Reduced from 8 to 6
-      aggressive: 4  // Reduced from 5 to 4
+      slow: 6, // Reduced from 8 to 6
+      normal: 4, // Reduced from 6 to 4
+      aggressive: 3  // Reduced from 4 to 3
     };
     
     if (requestCount > thresholds[crawlRate as keyof typeof thresholds]) {
@@ -131,7 +132,7 @@ export const ChatBot: React.FC = () => {
         } else {
           if (autoModeInterval) clearInterval(autoModeInterval);
         }
-      }, 3000);
+      }, 2000); // Reduced from 3000 to 2000ms for more frequent requests
     }
     
     return () => {
@@ -157,16 +158,20 @@ export const ChatBot: React.FC = () => {
         data: { message: input, type: 'suspiciousRapidFire' }
       });
       
-      setRequestCount(prev => prev + 2);
+      setRequestCount(prev => prev + 3); // Increased from 2 to 3
       return;
     }
     
     setLastResponseTime(now);
     
-    // Record the chat request as an API request
+    // Record the chat request as an API request with more details
     recordActivity({
       type: 'apiRequest',
-      data: { message: input, type: 'chatRequest' }
+      data: { 
+        message: input, 
+        type: 'chatRequest',
+        url: input.includes('KITS') ? 'https://www.kitsguntur.ac.in/search' : null
+      }
     });
     
     const userMessage: Message = {
@@ -181,9 +186,9 @@ export const ChatBot: React.FC = () => {
     setInput('');
     setIsTyping(true);
     
-    // Special behavior for aggressive mode - simulate multiple rapid scraping requests
+    // Special behavior for aggressive mode - simulate more intensive scraping
     if (crawlRate === 'aggressive') {
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 5; i++) { // Increased from 3 to 5
         recordActivity({
           type: 'apiRequest',
           data: { 
@@ -197,7 +202,7 @@ export const ChatBot: React.FC = () => {
     
     setRequestCount(prev => prev + 1);
     
-    const botTypingTime = crawlRate === 'aggressive' ? 300 : crawlRate === 'normal' ? 1000 : 2000;
+    const botTypingTime = crawlRate === 'aggressive' ? 300 : crawlRate === 'normal' ? 800 : 1500; // Reduced times
     
     setTimeout(() => {
       if (isBlocked) {
@@ -235,37 +240,51 @@ export const ChatBot: React.FC = () => {
   const generateBotResponse = (query: string): string => {
     const queryLower = query.toLowerCase();
     
-    // When generating a response, simulate accessing all website data
+    // Enhanced scraping simulation - record more intensive API requests
     // This is a key part of the scraping behavior that should trigger detection
     for (const website of sampleWebsites) {
       recordActivity({
         type: 'apiRequest',
-        data: { url: website.url, action: 'scrape', crawlRate }
+        data: { 
+          url: website.url, 
+          action: 'scrape', 
+          crawlRate,
+          timestamp: Date.now() 
+        }
       });
     }
     
-    // In aggressive mode, simulate intensive scraping
+    // In aggressive mode, simulate even more intensive scraping
     if (crawlRate === 'aggressive') {
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 8; i++) { // Increased from 5 to 8
         recordActivity({
           type: 'apiRequest',
-          data: { url: 'https://www.kitsguntur.ac.in/multiple-urls', action: 'rapid-scrape' }
+          data: { 
+            url: 'https://www.kitsguntur.ac.in/multiple-urls', 
+            action: 'rapid-scrape',
+            timestamp: Date.now() + i * 50 // Added timestamps with short intervals
+          }
         });
       }
       
       // Also simulate bot-like keyboard activity (very consistent timing)
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 5; i++) { // Increased from 3 to 5
         recordActivity({
           type: 'keyPress',
-          data: { key: 'a', timeStamp: Date.now() + i }
+          data: { key: 'a', timeStamp: Date.now() + i * 10 } // More consistent timing
         });
       }
     } else if (crawlRate === 'normal') {
-      // Normal mode does less intensive scraping
-      recordActivity({
-        type: 'apiRequest',
-        data: { url: 'https://www.kitsguntur.ac.in/search', action: 'search' }
-      });
+      // Normal mode does moderate scraping
+      for (let i = 0; i < 3; i++) { // Added loop
+        recordActivity({
+          type: 'apiRequest',
+          data: { 
+            url: 'https://www.kitsguntur.ac.in/search', 
+            action: crawlRate === 'normal' ? 'search' : 'scrape'
+          }
+        });
+      }
     }
     
     // Match query to relevant data from "scraped" websites
@@ -303,11 +322,15 @@ export const ChatBot: React.FC = () => {
     });
     
     if (rate === 'aggressive') {
-      // Simulate aggressive behavior immediately when switching to this mode
-      for (let i = 0; i < 3; i++) {
+      // Simulate even more aggressive behavior immediately when switching to this mode
+      for (let i = 0; i < 5; i++) { // Increased from 3 to 5
         recordActivity({
           type: 'apiRequest',
-          data: { url: 'https://www.kitsguntur.ac.in/', action: 'repetitive-access' }
+          data: { 
+            url: 'https://www.kitsguntur.ac.in/', 
+            action: 'repetitive-access',
+            timestamp: Date.now() + i * 100
+          }
         });
       }
       
