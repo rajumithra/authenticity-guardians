@@ -80,7 +80,7 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
        a.data.action === 'rapid-scrape' || 
        a.data.action === 'repetitive-access' || // Added new pattern
        (a.data.url && typeof a.data.url === 'string' && 
-        (a.data.url.includes('kitsguntur.ac.in') || a.data.url.includes('www.') || a.data.url.startsWith('http')))
+        (a.data.url.includes('kitsguntur.ac.in') || a.data.url.includes('www.') || a.data.url.startsWith('http'))))
     );
     
     // If scraping requests found, heavily increase the score
@@ -267,3 +267,4 @@ export const detectBotType = (score: BotScore): BotType | null => {
   
   return 'unknown';
 };
+
