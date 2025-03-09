@@ -166,7 +166,10 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
         }
 
         if (shouldBlock && !prevSession.isBlocked) {
-          blockBot(prevSession.id, `High bot score: ${updatedScore.total}`);
+          // Call blockBot outside the state update to avoid state update conflicts
+          setTimeout(() => {
+            blockBot(prevSession.id, `High bot score: ${updatedScore.total}`);
+          }, 0);
         }
 
         return {
@@ -269,7 +272,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
           if (rapidUpdatedScore.total > BOT_SCORE_THRESHOLD - 10 || rapidUpdatedScore.requestPattern > 70) { // Lowered from 80 to 70
             setTimeout(() => {
               blockBot(FIXED_SESSION_ID, `Aggressive scraping detected`);
-            }, 200); // Reduced from 500 to 200ms for faster blocking
+            }, 0); // Changed from 200ms to 0 for immediate blocking
           }
         }
       }
@@ -303,47 +306,58 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     if (isBlocked) return; // Prevent multiple blocks
 
+    // Set blocked state immediately
     setIsBlocked(true);
-    setCurrentSession(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        isBlocked: true
+    
+    // Update session state to reflect blocked status - CRITICAL FIX
+    setCurrentSession(prevSession => {
+      if (!prevSession) return null;
+      
+      // Make sure to update the session with blocked status
+      const updatedSession = {
+        ...prevSession,
+        isBlocked: true,
+        // Ensure the botType is set when blocking
+        botType: prevSession.botType || detectBotType(prevSession.botScore)
       };
-    });
-
-    // Add to blocked bots list
-    if (currentSession) {
+      
+      // Add to blocked bots list
       const blockedBot: BlockedBot = {
         sessionId,
-        ip: currentSession.ip,
-        userAgent: currentSession.userAgent,
-        botScore: currentSession.botScore,
-        botType: (currentSession.botType || 'unknown') as BotType,
+        ip: updatedSession.ip,
+        userAgent: updatedSession.userAgent,
+        botScore: updatedSession.botScore,
+        botType: (updatedSession.botType || 'unknown') as BotType,
         timeBlocked: Date.now(),
         reason
       };
       
-      setBlockedBots(prev => {
-        // Check if already blocked to prevent duplicates
-        if (prev.some(bot => bot.sessionId === sessionId)) {
-          return prev;
-        }
-        return [...prev, blockedBot];
-      });
+      // Update blocked bots in next tick to avoid state conflicts
+      setTimeout(() => {
+        setBlockedBots(prev => {
+          // Check if already blocked to prevent duplicates
+          if (prev.some(bot => bot.sessionId === sessionId)) {
+            return prev;
+          }
+          return [...prev, blockedBot];
+        });
+        
+        addLog('warning', `Bot blocked: ${sessionId}`, {
+          reason,
+          botScore: updatedSession.botScore
+        });
+      }, 0);
       
-      addLog('warning', `Bot blocked: ${sessionId}`, {
-        reason,
-        botScore: currentSession.botScore
-      });
-
+      // Show toast notification
       toast({
         title: "Bot Activity Detected!",
         description: `A bot has been blocked. Reason: ${reason}`,
         variant: "destructive",
         duration: 5000,
       });
-    }
+      
+      return updatedSession;
+    });
   };
 
   const resetSession = () => {
