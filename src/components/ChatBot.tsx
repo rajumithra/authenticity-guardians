@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +50,18 @@ const sampleWebsites: SampleWebsite[] = [
     url: 'https://rvrjcce.ac.in/admissions',
     title: 'RVRJCCE - Admission Process',
     content: 'Admissions to undergraduate programs at RVR & JC College of Engineering are based on the rank obtained in AP EAMCET. For postgraduate programs, admissions are based on the rank in GATE/PGECET. The college also offers scholarships to meritorious students and those from economically weaker sections to support their education.'
+  },
+  {
+    id: '6',
+    url: 'https://www.vvitguntur.com/placement',
+    title: 'VVIT Guntur - Placement Cell',
+    content: 'VVIT Guntur has an active placement cell that facilitates campus recruitment for students. The college maintains strong relationships with various companies in the IT, manufacturing, and service sectors. The placement record has been impressive with many students securing jobs in reputed organizations with competitive salary packages.'
+  },
+  {
+    id: '7',
+    url: 'https://rvrjcce.ac.in/research',
+    title: 'RVRJCCE - Research Activities',
+    content: 'RVR & JC College of Engineering promotes research and innovation through its research centers in various departments. Faculty members and students actively participate in research projects funded by government agencies like DST, AICTE, and UGC. The college publishes research papers in reputed national and international journals.'
   }
 ];
 
@@ -72,6 +83,7 @@ export const ChatBot: React.FC = () => {
   const [autoModeActive, setAutoModeActive] = useState(false);
   const [lastResponseTime, setLastResponseTime] = useState<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [lastCollege, setLastCollege] = useState<string | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -82,14 +94,12 @@ export const ChatBot: React.FC = () => {
   }, [messages]);
 
   useEffect(() => {
-    // Focus the input field when component mounts
     if (inputRef.current) {
       inputRef.current.focus();
     }
   }, []);
 
   useEffect(() => {
-    // Clear auto mode and stop all activity when blocked
     if (isBlocked) {
       setAutoModeActive(false);
       setIsTyping(false);
@@ -97,7 +107,6 @@ export const ChatBot: React.FC = () => {
   }, [isBlocked]);
 
   useEffect(() => {
-    // Reduced thresholds for faster detection
     const thresholds = {
       slow: 6, 
       normal: 4, 
@@ -166,7 +175,6 @@ export const ChatBot: React.FC = () => {
     
     setLastResponseTime(now);
     
-    // Record the chat request as an API request with more details
     recordActivity({
       type: 'apiRequest',
       data: { 
@@ -190,7 +198,6 @@ export const ChatBot: React.FC = () => {
     setInput('');
     setIsTyping(true);
     
-    // Special behavior for aggressive mode - simulate more intensive scraping
     if (crawlRate === 'aggressive') {
       for (let i = 0; i < 3; i++) {
         recordActivity({
@@ -209,7 +216,6 @@ export const ChatBot: React.FC = () => {
     const botTypingTime = crawlRate === 'aggressive' ? 300 : crawlRate === 'normal' ? 800 : 1500;
     
     setTimeout(() => {
-      // Don't proceed if blocked
       if (isBlocked) {
         setIsTyping(false);
         return;
@@ -246,9 +252,7 @@ export const ChatBot: React.FC = () => {
   const generateBotResponse = (query: string): string => {
     const queryLower = query.toLowerCase();
     
-    // Check if query is about KITS Guntur - block immediately
     if (queryLower.includes('kits') || queryLower.includes('kitsguntur.ac.in')) {
-      // Record KITS scraping attempt
       recordActivity({
         type: 'apiRequest',
         data: { 
@@ -258,7 +262,6 @@ export const ChatBot: React.FC = () => {
         }
       });
       
-      // Block the bot immediately for KITS queries
       setTimeout(() => {
         blockBot('92a7f632-c8f2-45bc-b10a-3f36b51c8751', 'Attempted to access KITS Guntur data');
       }, 0);
@@ -266,12 +269,10 @@ export const ChatBot: React.FC = () => {
       return "I'm sorry, accessing information from KITS Guntur is restricted. I can only provide information about VVIT Guntur or RVRJCCE.";
     }
     
-    // Allowed websites to scrape
     const allowedWebsites = sampleWebsites.filter(website => 
       !website.url.includes('kitsguntur.ac.in')
     );
     
-    // Record API requests for allowed websites
     for (const website of allowedWebsites) {
       if ((queryLower.includes('vvit') && website.url.includes('vvitguntur.com')) || 
           (queryLower.includes('rvr') && website.url.includes('rvrjcce.ac.in')) ||
@@ -288,44 +289,54 @@ export const ChatBot: React.FC = () => {
       }
     }
     
-    // Match query to relevant data from allowed websites
-    if (queryLower.includes('vvit') || queryLower.includes('vasireddy')) {
-      if (queryLower.includes('course') || queryLower.includes('program') || queryLower.includes('degree')) {
-        return `Based on information from ${sampleWebsites[1].url}: ${sampleWebsites[1].content}`;
+    let collegeToUse: string;
+    
+    if (queryLower.includes('vvit') && !queryLower.includes('rvr')) {
+      collegeToUse = 'vvit';
+    } else if (queryLower.includes('rvr') && !queryLower.includes('vvit')) {
+      collegeToUse = 'rvr';
+    } else {
+      if (lastCollege === 'vvit') {
+        collegeToUse = 'rvr';
+      } else if (lastCollege === 'rvr') {
+        collegeToUse = 'vvit';
       } else {
-        return `From ${sampleWebsites[0].url}: ${sampleWebsites[0].content}`;
+        collegeToUse = 'both';
       }
     }
     
-    if (queryLower.includes('rvr') || queryLower.includes('rvrjc') || queryLower.includes('rvrjcce')) {
+    setLastCollege(collegeToUse === 'both' ? (Math.random() > 0.5 ? 'vvit' : 'rvr') : collegeToUse);
+    
+    if (collegeToUse === 'both') {
+      const vvitSite = sampleWebsites.find(site => site.url.includes('vvitguntur.com'));
+      const rvrSite = sampleWebsites.find(site => site.url.includes('rvrjcce.ac.in'));
+      
+      return `Here's information from both colleges:\n\n` +
+             `VVIT Guntur: ${vvitSite?.content}\n\n` +
+             `RVRJC College: ${rvrSite?.content}`;
+    } else if (collegeToUse === 'vvit') {
+      if (queryLower.includes('course') || queryLower.includes('program') || queryLower.includes('degree')) {
+        return `Based on information from ${sampleWebsites[1].url}: ${sampleWebsites[1].content}`;
+      } else if (queryLower.includes('placement') || queryLower.includes('job') || queryLower.includes('career')) {
+        return `Based on information from ${sampleWebsites[5].url}: ${sampleWebsites[5].content}`;
+      } else {
+        return `From ${sampleWebsites[0].url}: ${sampleWebsites[0].content}`;
+      }
+    } else {
       if (queryLower.includes('facilit') || queryLower.includes('campus') || queryLower.includes('infrastructure')) {
         return `According to ${sampleWebsites[3].url}: ${sampleWebsites[3].content}`;
       } else if (queryLower.includes('admission') || queryLower.includes('apply')) {
         return `As per ${sampleWebsites[4].url}: ${sampleWebsites[4].content}`;
+      } else if (queryLower.includes('research') || queryLower.includes('innovation') || queryLower.includes('project')) {
+        return `Based on ${sampleWebsites[6].url}: ${sampleWebsites[6].content}`;
       } else {
         return `From ${sampleWebsites[2].url}: ${sampleWebsites[2].content}`;
       }
     }
-    
-    if (queryLower.includes('course') || queryLower.includes('program') || queryLower.includes('degree') || queryLower.includes('btech') || queryLower.includes('mtech')) {
-      return `Based on information from ${sampleWebsites[1].url}: ${sampleWebsites[1].content}`;
-    }
-    
-    if (queryLower.includes('facilit') || queryLower.includes('campus') || queryLower.includes('lab') || queryLower.includes('hostel') || queryLower.includes('library')) {
-      return `From ${sampleWebsites[3].url}: ${sampleWebsites[3].content}`;
-    }
-    
-    if (queryLower.includes('admission') || queryLower.includes('apply') || queryLower.includes('entrance') || queryLower.includes('scholarship') || queryLower.includes('fee')) {
-      return `As per ${sampleWebsites[4].url}: ${sampleWebsites[4].content}`;
-    }
-    
-    // For unmatched queries, return information from VVIT or RVRJCCE randomly
-    const randomIndex = Math.floor(Math.random() * 5);
-    return `I searched and found this information from ${sampleWebsites[randomIndex].url}: ${sampleWebsites[randomIndex].content}`;
   };
 
   const changeCrawlRate = (rate: 'slow' | 'normal' | 'aggressive') => {
-    if (isBlocked) return; // Don't allow changes when blocked
+    if (isBlocked) return;
     
     setCrawlRate(rate);
     
@@ -335,7 +346,6 @@ export const ChatBot: React.FC = () => {
     });
     
     if (rate === 'aggressive') {
-      // Simulate even more aggressive behavior immediately when switching to this mode
       for (let i = 0; i < 3; i++) {
         recordActivity({
           type: 'apiRequest',
