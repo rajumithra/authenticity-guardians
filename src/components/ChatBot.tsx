@@ -89,6 +89,14 @@ export const ChatBot: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Clear auto mode and stop all activity when blocked
+    if (isBlocked) {
+      setAutoModeActive(false);
+      setIsTyping(false);
+    }
+  }, [isBlocked]);
+
+  useEffect(() => {
     // Reduced thresholds for faster detection
     const thresholds = {
       slow: 6, 
@@ -105,12 +113,6 @@ export const ChatBot: React.FC = () => {
   useEffect(() => {
     setRequestCount(0);
   }, [crawlRate]);
-
-  useEffect(() => {
-    if (isBlocked && autoModeActive) {
-      setAutoModeActive(false);
-    }
-  }, [isBlocked, autoModeActive]);
 
   useEffect(() => {
     let autoModeInterval: NodeJS.Timeout | null = null;
@@ -171,7 +173,8 @@ export const ChatBot: React.FC = () => {
         message: input, 
         type: 'chatRequest',
         url: input.includes('VVIT') ? 'https://www.vvitguntur.com/search' : 
-             input.includes('RVR') ? 'https://rvrjcce.ac.in/search' : null
+             input.includes('RVR') ? 'https://rvrjcce.ac.in/search' : 
+             input.includes('KITS') ? 'https://www.kitsguntur.ac.in/search' : null
       }
     });
     
@@ -189,7 +192,7 @@ export const ChatBot: React.FC = () => {
     
     // Special behavior for aggressive mode - simulate more intensive scraping
     if (crawlRate === 'aggressive') {
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 3; i++) {
         recordActivity({
           type: 'apiRequest',
           data: { 
@@ -206,6 +209,7 @@ export const ChatBot: React.FC = () => {
     const botTypingTime = crawlRate === 'aggressive' ? 300 : crawlRate === 'normal' ? 800 : 1500;
     
     setTimeout(() => {
+      // Don't proceed if blocked
       if (isBlocked) {
         setIsTyping(false);
         return;
@@ -218,7 +222,8 @@ export const ChatBot: React.FC = () => {
         data: { 
           responseType: 'chatResponse', 
           crawlRate, 
-          targetSite: currentInput.includes('VVIT') ? 'https://www.vvitguntur.com/' : 'https://rvrjcce.ac.in/',
+          targetSite: currentInput.toLowerCase().includes('vvit') ? 'https://www.vvitguntur.com/' : 
+                     currentInput.toLowerCase().includes('rvr') ? 'https://rvrjcce.ac.in/' : null,
           timeToRespond: botTypingTime
         }
       });
@@ -241,57 +246,49 @@ export const ChatBot: React.FC = () => {
   const generateBotResponse = (query: string): string => {
     const queryLower = query.toLowerCase();
     
-    // Enhanced scraping simulation - record more intensive API requests
-    // This is a key part of the scraping behavior that should trigger detection
-    for (const website of sampleWebsites) {
-      // Skip any KITS Guntur URLs
-      if (website.url.includes('kitsguntur.ac.in')) continue;
-      
+    // Check if query is about KITS Guntur - block immediately
+    if (queryLower.includes('kits') || queryLower.includes('kitsguntur.ac.in')) {
+      // Record KITS scraping attempt
       recordActivity({
         type: 'apiRequest',
         data: { 
-          url: website.url, 
-          action: 'scrape', 
-          crawlRate,
-          timestamp: Date.now() 
+          url: 'https://www.kitsguntur.ac.in', 
+          action: 'blocked-scrape', 
+          reason: 'Restricted website'
         }
       });
-    }
-    
-    // In aggressive mode, simulate even more intensive scraping
-    if (crawlRate === 'aggressive') {
-      for (let i = 0; i < 8; i++) {
-        recordActivity({
-          type: 'apiRequest',
-          data: { 
-            url: i % 2 === 0 ? 'https://www.vvitguntur.com/multiple-urls' : 'https://rvrjcce.ac.in/multiple-urls', 
-            action: 'rapid-scrape',
-            timestamp: Date.now() + i * 50
-          }
-        });
-      }
       
-      // Also simulate bot-like keyboard activity (very consistent timing)
-      for (let i = 0; i < 5; i++) {
-        recordActivity({
-          type: 'keyPress',
-          data: { key: 'a', timeStamp: Date.now() + i * 10 }
-        });
-      }
-    } else if (crawlRate === 'normal') {
-      // Normal mode does moderate scraping
-      for (let i = 0; i < 3; i++) {
+      // Block the bot immediately for KITS queries
+      setTimeout(() => {
+        blockBot('92a7f632-c8f2-45bc-b10a-3f36b51c8751', 'Attempted to access KITS Guntur data');
+      }, 0);
+      
+      return "I'm sorry, accessing information from KITS Guntur is restricted. I can only provide information about VVIT Guntur or RVRJCCE.";
+    }
+    
+    // Allowed websites to scrape
+    const allowedWebsites = sampleWebsites.filter(website => 
+      !website.url.includes('kitsguntur.ac.in')
+    );
+    
+    // Record API requests for allowed websites
+    for (const website of allowedWebsites) {
+      if ((queryLower.includes('vvit') && website.url.includes('vvitguntur.com')) || 
+          (queryLower.includes('rvr') && website.url.includes('rvrjcce.ac.in')) ||
+          (!queryLower.includes('vvit') && !queryLower.includes('rvr') && Math.random() > 0.5)) {
         recordActivity({
           type: 'apiRequest',
           data: { 
-            url: i % 2 === 0 ? 'https://www.vvitguntur.com/search' : 'https://rvrjcce.ac.in/search', 
-            action: crawlRate === 'normal' ? 'search' : 'scrape'
+            url: website.url, 
+            action: crawlRate === 'aggressive' ? 'scrape' : 'search',
+            crawlRate,
+            timestamp: Date.now() 
           }
         });
       }
     }
     
-    // Match query to relevant data from "scraped" websites
+    // Match query to relevant data from allowed websites
     if (queryLower.includes('vvit') || queryLower.includes('vasireddy')) {
       if (queryLower.includes('course') || queryLower.includes('program') || queryLower.includes('degree')) {
         return `Based on information from ${sampleWebsites[1].url}: ${sampleWebsites[1].content}`;
@@ -322,19 +319,14 @@ export const ChatBot: React.FC = () => {
       return `As per ${sampleWebsites[4].url}: ${sampleWebsites[4].content}`;
     }
     
-    if (queryLower.includes('kits') || queryLower.includes('guntur college')) {
-      return `I'm sorry, I don't have specific information about KITS Guntur. However, I can provide information about VVIT Guntur or RVRJCCE. Would you like to know about either of these colleges?`;
-    }
-    
-    // For unmatched queries, return information from VVIT or RVRJCCE
-    const relevantSites = sampleWebsites.filter(site => 
-      !site.url.includes('kitsguntur.ac.in')
-    );
-    const randomSite = relevantSites[Math.floor(Math.random() * relevantSites.length)];
-    return `I searched and found this information from ${randomSite.url}: ${randomSite.content}`;
+    // For unmatched queries, return information from VVIT or RVRJCCE randomly
+    const randomIndex = Math.floor(Math.random() * 5);
+    return `I searched and found this information from ${sampleWebsites[randomIndex].url}: ${sampleWebsites[randomIndex].content}`;
   };
 
   const changeCrawlRate = (rate: 'slow' | 'normal' | 'aggressive') => {
+    if (isBlocked) return; // Don't allow changes when blocked
+    
     setCrawlRate(rate);
     
     recordActivity({
@@ -344,7 +336,7 @@ export const ChatBot: React.FC = () => {
     
     if (rate === 'aggressive') {
       // Simulate even more aggressive behavior immediately when switching to this mode
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 3; i++) {
         recordActivity({
           type: 'apiRequest',
           data: { 

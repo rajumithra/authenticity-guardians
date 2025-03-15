@@ -14,6 +14,8 @@ interface BotDetectionContextType {
   isBlocked: boolean;
   resetSession: () => void;
   clearLogs: () => void;
+  humanScore: number;
+  securityScore: number;
 }
 
 const BotDetectionContext = createContext<BotDetectionContextType>({
@@ -26,6 +28,8 @@ const BotDetectionContext = createContext<BotDetectionContextType>({
   isBlocked: false,
   resetSession: () => {},
   clearLogs: () => {},
+  humanScore: 60,
+  securityScore: 70,
 });
 
 export const useBotDetection = () => useContext(BotDetectionContext);
@@ -78,7 +82,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
     
     // Listen for mouse movements
     const handleMouseMove = (e: MouseEvent) => {
-      if (currentSession && !currentSession.isBlocked) {
+      if (currentSession && !isBlocked) {
         // Only record every 5th mouse movement to avoid flooding
         setMouseMovementCount(prev => {
           if (prev >= 4) {
@@ -95,7 +99,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     // Listen for key presses
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (currentSession && !currentSession.isBlocked) {
+      if (currentSession && !isBlocked) {
         recordActivity({
           type: 'keyPress',
           data: { key: e.key, timeStamp: e.timeStamp }
@@ -105,7 +109,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     // Listen for clicks
     const handleClick = (e: MouseEvent) => {
-      if (currentSession && !currentSession.isBlocked) {
+      if (currentSession && !isBlocked) {
         recordActivity({
           type: 'mouseClick',
           data: { x: e.clientX, y: e.clientY, target: (e.target as Element).tagName }
@@ -115,7 +119,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     // Listen for scroll events
     const handleScroll = () => {
-      if (currentSession && !currentSession.isBlocked) {
+      if (currentSession && !isBlocked) {
         recordActivity({
           type: 'scrollEvent',
           data: { 
@@ -138,11 +142,11 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
       window.removeEventListener('click', handleClick);
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [currentSession]);
+  }, [currentSession, isBlocked]);
 
   // Update bot score more frequently for faster detection
   useEffect(() => {
-    if (!currentSession || currentSession.isBlocked) return;
+    if (!currentSession || isBlocked) return;
 
     const updateInterval = setInterval(() => {
       setCurrentSession(prevSession => {
@@ -174,17 +178,17 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
           }, 0);
         }
 
-        // Update human and security scores inversely to bot score
-        // Higher bot score = lower human score and security score
+        // Update human score based on bot score - ensure it's the opposite
         setHumanScore(Math.max(0, 100 - updatedScore.total));
-        setSecurityScore(prevSecurityScore => {
-          // Gradually adjust security score based on bot score
+        
+        // Adjust security score based on bot score
+        setSecurityScore(prev => {
           if (updatedScore.total > 50) {
-            return Math.max(0, prevSecurityScore - 2);
+            return Math.max(0, prev - 3); // Decrease more rapidly when bot score is high
           } else if (updatedScore.total < 30) {
-            return Math.min(100, prevSecurityScore + 1);
+            return Math.min(100, prev + 1);
           }
-          return prevSecurityScore;
+          return prev;
         });
 
         return {
@@ -200,7 +204,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
     }, 800);
 
     return () => clearInterval(updateInterval);
-  }, [currentSession, recentApiRequests]);
+  }, [currentSession, recentApiRequests, isBlocked]);
 
   const initSession = () => {
     // Use fixed session ID instead of generating a new one
@@ -241,69 +245,52 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
       const updatedActivities = [...prevSession.activities, newActivity];
       const limitedActivities = updatedActivities.slice(-200); // Keep last 200 activities
       
-      // Special handling for API requests - they increase bot score more rapidly
-      let rapidUpdatedScore = {...prevSession.botScore};
+      // Special handling for KITS Guntur scraping attempts
       if (activity.type === 'apiRequest') {
         const requestData = activity.data;
         
         // Track API requests for short-term burst detection
         setRecentApiRequests(prev => prev + 1);
         
-        // Enhanced detection for website scraping
-        const isScraping = 
-          requestData.action === 'scrape' || 
-          requestData.action === 'rapid-scrape' || 
-          requestData.action === 'repetitive-access' ||
-          (requestData.url && typeof requestData.url === 'string' && 
-           (requestData.url.includes('kitsguntur.ac.in')));
+        // Enhanced detection specifically for KITS Guntur scraping
+        const isKitsScraping = requestData.url && 
+                               typeof requestData.url === 'string' && 
+                               requestData.url.includes('kitsguntur.ac.in');
             
-        if (isScraping) {
-          // Much more aggressive scoring for detected scraping
-          rapidUpdatedScore.requestPattern = Math.min(100, rapidUpdatedScore.requestPattern + 15);
+        if (isKitsScraping) {
+          // Immediately block bots trying to access KITS data
+          addLog('warning', `KITS Guntur scraping blocked: ${requestData.url}`, requestData);
           
-          // If aggressive scraping detected, immediately elevate the score 
-          if (requestData.action === 'rapid-scrape' || 
-              requestData.type === 'suspiciousRapidFire' ||
-              (Array.isArray(limitedActivities) && 
-               limitedActivities.filter(a => 
-                 a.type === 'apiRequest' && 
-                 a.timestamp > Date.now() - 5000
-               ).length > 5)) {
-            rapidUpdatedScore.requestPattern = Math.min(100, rapidUpdatedScore.requestPattern + 25);
-          }
+          // Call blockBot directly for immediate blocking
+          setTimeout(() => {
+            blockBot(FIXED_SESSION_ID, `KITS Guntur website scraping blocked`);
+          }, 0);
           
-          // Recalculate the total score with more weight on the request pattern
-          rapidUpdatedScore.total = Math.round(
-            (rapidUpdatedScore.mouseMovement * 0.15) + 
-            (rapidUpdatedScore.keyboardPattern * 0.15) + 
-            (rapidUpdatedScore.navigationPattern * 0.15) + 
-            (rapidUpdatedScore.requestPattern * 0.45) + 
-            (rapidUpdatedScore.timePattern * 0.10)
-          );
-          
-          // Log the scraping activity
-          addLog('warning', `Potential scraping detected: ${requestData.url || 'API request'}`, requestData);
-          
-          // If the score is high enough, block immediately for aggressive scraping
-          if (rapidUpdatedScore.total > BOT_SCORE_THRESHOLD - 10 || rapidUpdatedScore.requestPattern > 70) {
-            // Use direct call instead of setTimeout to ensure immediate blocking
-            blockBot(FIXED_SESSION_ID, `Aggressive scraping detected`);
-            return {
-              ...prevSession,
-              activities: limitedActivities,
-              lastActive: Date.now(),
-              botScore: rapidUpdatedScore,
-              isBlocked: true
-            };
-          }
+          return {
+            ...prevSession,
+            activities: limitedActivities,
+            isBlocked: true,
+            lastActive: Date.now()
+          };
         }
+      }
+      
+      // Update human score based on activity type for more dynamic changes
+      if (activity.type === 'mouseMove') {
+        setHumanScore(prev => Math.min(100, prev + 0.2));
+      } else if (activity.type === 'keyPress') {
+        setHumanScore(prev => Math.min(100, prev + 0.3));
+      } else if (activity.type === 'mouseClick') {
+        setHumanScore(prev => Math.min(100, prev + 0.5));
+      } else if (activity.type === 'apiRequest') {
+        // API requests may decrease human score
+        setHumanScore(prev => Math.max(0, prev - 1));
       }
       
       return {
         ...prevSession,
         activities: limitedActivities,
-        lastActive: Date.now(),
-        botScore: rapidUpdatedScore
+        lastActive: Date.now()
       };
     });
 
@@ -312,70 +299,63 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     // Enhanced logging for better debugging
     if (activity.type === 'apiRequest') {
-      if (activity.data.action === 'scrape' || activity.data.action === 'rapid-scrape') {
-        addLog('warning', `Scraping detected: ${activity.data.url || 'Unknown URL'}`, activity.data);
-      } else if (activity.data.url && typeof activity.data.url === 'string' && 
-                (activity.data.url.includes('kitsguntur.ac.in'))) {
-        addLog('warning', `Restricted website scraping attempted: ${activity.data.url}`, activity.data);
+      if (activity.data.url && typeof activity.data.url === 'string' && 
+          activity.data.url.includes('kitsguntur.ac.in')) {
+        addLog('warning', `KITS Guntur scraping attempt blocked: ${activity.data.url}`, activity.data);
+      } else if (activity.data.action === 'scrape' || activity.data.action === 'rapid-scrape') {
+        addLog('warning', `Web scraping detected: ${activity.data.url || 'Unknown URL'}`, activity.data);
       }
-    }
-
-    // Update human score based on activity type
-    if (activity.type === 'mouseMove' || activity.type === 'keyPress' || activity.type === 'mouseClick') {
-      // Natural user activities increase human score
-      setHumanScore(prev => Math.min(100, prev + 0.5));
-    } else if (activity.type === 'apiRequest') {
-      // API requests may decrease human score
-      setHumanScore(prev => Math.max(0, prev - 1));
     }
   };
 
   const blockBot = (sessionId: string, reason: string) => {
-    if (!currentSession) return;
     if (isBlocked) return; // Prevent multiple blocks
 
-    // Set blocked state immediately
+    // Set blocked state immediately to prevent further activities
     setIsBlocked(true);
     
-    // Create the blocked bot entry before updating state
-    const blockedBot: BlockedBot = {
-      sessionId,
-      ip: currentSession.ip,
-      userAgent: currentSession.userAgent,
-      botScore: currentSession.botScore,
-      botType: (currentSession.botType || detectBotType(currentSession.botScore)) as BotType,
-      timeBlocked: Date.now(),
-      reason
-    };
-    
-    // Update session state first with a direct update
+    // Update session state with blocked status
     setCurrentSession(prevSession => {
       if (!prevSession) return null;
+      
+      // Create the blocked bot entry
+      const botType = prevSession.botType || detectBotType(prevSession.botScore);
+      
+      // Add to blocked bots list
+      setBlockedBots(prev => {
+        // Check if already blocked to prevent duplicates
+        if (prev.some(bot => bot.sessionId === sessionId)) {
+          return prev;
+        }
+        
+        const blockedBot: BlockedBot = {
+          sessionId,
+          ip: prevSession.ip,
+          userAgent: prevSession.userAgent,
+          botScore: prevSession.botScore,
+          botType: botType as BotType,
+          timeBlocked: Date.now(),
+          reason
+        };
+        
+        return [...prev, blockedBot];
+      });
+      
+      // Add log entry
+      addLog('warning', `Bot blocked: ${sessionId}`, {
+        reason,
+        botScore: prevSession.botScore
+      });
+      
+      // Update security score when a bot is blocked
+      setSecurityScore(prev => Math.max(0, prev - 20));
       
       return {
         ...prevSession,
         isBlocked: true,
-        botType: prevSession.botType || detectBotType(prevSession.botScore)
+        botType: botType
       };
     });
-    
-    // Then update blocked bots list
-    setBlockedBots(prev => {
-      // Check if already blocked to prevent duplicates
-      if (prev.some(bot => bot.sessionId === sessionId)) {
-        return prev;
-      }
-      return [...prev, blockedBot];
-    });
-    
-    // Add log entry
-    addLog('warning', `Bot blocked: ${sessionId}`, {
-      reason,
-      botScore: currentSession.botScore
-    });
-    
-    // Update security score when a bot is blocked
-    setSecurityScore(prev => Math.max(0, prev - 15));
     
     // Show toast notification outside of state updates
     setTimeout(() => {
@@ -385,7 +365,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
         variant: "destructive",
         duration: 5000,
       });
-    }, 0);
+    }, 10);
   };
 
   const resetSession = () => {
@@ -422,7 +402,9 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
         blockBot,
         isBlocked,
         resetSession,
-        clearLogs
+        clearLogs,
+        humanScore,
+        securityScore
       }}
     >
       {children}

@@ -1,4 +1,3 @@
-
 import { BotScore, UserSession, BotType } from '../models/BotDetectionTypes';
 
 // Analyze user behavior to determine bot likelihood
@@ -74,33 +73,42 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
   // Analyze request patterns (API calls) - ENHANCED FOR BETTER SCRAPING DETECTION
   const apiRequests = recentActivities.filter(a => a.type === 'apiRequest');
   if (apiRequests.length > 0) {
-    // Look specifically for restricted scraping-related API requests
-    const scrapingRequests = apiRequests.filter(a => 
-      (a.data.action === 'scrape' || 
-       a.data.action === 'rapid-scrape' || 
-       a.data.action === 'repetitive-access' || 
-       (a.data.url && typeof a.data.url === 'string' && a.data.url.includes('kitsguntur.ac.in')))
+    // Look specifically for kitsguntur.ac.in scraping attempts
+    const kitsScrapingRequests = apiRequests.filter(a => 
+      (a.data.url && typeof a.data.url === 'string' && a.data.url.includes('kitsguntur.ac.in'))
     );
     
-    // If scraping requests found, heavily increase the score
-    if (scrapingRequests.length > 0) {
-      // More aggressive penalty for scraping - increased even more
-      newScore.requestPattern = Math.min(100, botScore.requestPattern + scrapingRequests.length * 10);
+    // If KITS scraping requests found, drastically increase the score
+    if (kitsScrapingRequests.length > 0) {
+      // Very aggressive penalty for KITS scraping
+      newScore.requestPattern = Math.min(100, botScore.requestPattern + kitsScrapingRequests.length * 20);
       
-      // If more than 3 scraping requests detected, drastically increase score
-      if (scrapingRequests.length > 3) {
-        newScore.requestPattern = Math.min(100, newScore.requestPattern + 20);
+      // Even a single KITS scraping request is enough for high penalty
+      if (kitsScrapingRequests.length >= 1) {
+        newScore.requestPattern = Math.min(100, newScore.requestPattern + 40);
       }
     } else {
-      // For regular API requests, analyze normally
-      const requestNaturality = calculateRequestNaturality(apiRequests);
+      // Check for other scraping actions
+      const scrapingRequests = apiRequests.filter(a => 
+        (a.data.action === 'scrape' || 
+         a.data.action === 'rapid-scrape' || 
+         a.data.action === 'repetitive-access')
+      );
       
-      // Update the score - increase weight for API requests to detect scraping faster
-      newScore.requestPattern = Math.max(0, botScore.requestPattern - requestNaturality + 8);
-      
-      // Random increase with higher probability
-      if (Math.random() > 0.4) {
-        newScore.requestPattern = Math.min(100, newScore.requestPattern + 6);
+      if (scrapingRequests.length > 0) {
+        // Normal penalty for other scraping
+        newScore.requestPattern = Math.min(100, botScore.requestPattern + scrapingRequests.length * 8);
+      } else {
+        // For regular API requests, analyze normally
+        const requestNaturality = calculateRequestNaturality(apiRequests);
+        
+        // Update the score - normal weight for API requests
+        newScore.requestPattern = Math.max(0, botScore.requestPattern - requestNaturality + 5);
+        
+        // Random increase with medium probability
+        if (Math.random() > 0.5) {
+          newScore.requestPattern = Math.min(100, newScore.requestPattern + 3);
+        }
       }
     }
   }

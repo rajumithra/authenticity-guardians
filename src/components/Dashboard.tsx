@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw, ShieldAlert, Activity, Bot, List, Settings } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
-  const { currentSession, resetSession } = useBotDetection();
+  const { currentSession, resetSession, humanScore, securityScore } = useBotDetection();
 
   return (
     <div className="min-h-screen bg-cyber-dark text-white p-6 cyber-grid">
@@ -42,7 +42,7 @@ export const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <ScoreCard 
               title="Human Score" 
-              score={currentSession ? 100 - currentSession.botScore.total : 0} 
+              score={humanScore} 
               type="human"
               icon={<Activity className="h-5 w-5 text-emerald-500" />}
             />
@@ -56,7 +56,7 @@ export const Dashboard: React.FC = () => {
             
             <ScoreCard 
               title="Security Status" 
-              score={currentSession ? Math.max(0, 100 - currentSession.botScore.total) : 0} 
+              score={securityScore} 
               type="security"
               icon={<ShieldAlert className="h-5 w-5 text-sky-500" />}
             />
