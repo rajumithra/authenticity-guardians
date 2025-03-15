@@ -70,6 +70,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [recentApiRequests, setRecentApiRequests] = useState<number>(0);
   const [humanScore, setHumanScore] = useState(60);
   const [securityScore, setSecurityScore] = useState(70);
+  const [scoreUpdateCounter, setScoreUpdateCounter] = useState(0);
 
   useEffect(() => {
     initSession();
@@ -134,9 +135,17 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, [currentSession, isBlocked]);
 
   useEffect(() => {
+    const scoreUpdateInterval = setInterval(() => {
+      setScoreUpdateCounter(prev => prev + 1);
+    }, 350);
+    
+    return () => clearInterval(scoreUpdateInterval);
+  }, []);
+
+  useEffect(() => {
     if (!currentSession || isBlocked) return;
 
-    const updateInterval = setInterval(() => {
+    const updateSession = () => {
       setCurrentSession(prevSession => {
         if (!prevSession) return null;
 
@@ -183,10 +192,16 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
       });
 
       setRecentApiRequests(0);
+    };
+
+    updateSession();
+    
+    const updateInterval = setInterval(() => {
+      updateSession();
     }, 500);
 
     return () => clearInterval(updateInterval);
-  }, [currentSession, recentApiRequests, isBlocked]);
+  }, [currentSession, recentApiRequests, isBlocked, scoreUpdateCounter]);
 
   const initSession = () => {
     const newSession: UserSession = {
@@ -229,12 +244,14 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
         
         setRecentApiRequests(prev => prev + 1);
         
-        const isKitsScraping = requestData.url && 
-                               typeof requestData.url === 'string' && 
-                               requestData.url.includes('kitsguntur.ac.in');
+        const isKitsScraping = 
+          (requestData.url && typeof requestData.url === 'string' && requestData.url.includes('kitsguntur.ac.in')) ||
+          (requestData.message && typeof requestData.message === 'string' && 
+            (requestData.message.toLowerCase().includes('kits') || 
+             requestData.message.toLowerCase().includes('kakinada')));
             
         if (isKitsScraping) {
-          addLog('warning', `KITS Guntur scraping blocked: ${requestData.url}`, requestData);
+          addLog('warning', `KITS Guntur scraping blocked: ${requestData.url || requestData.message}`, requestData);
           
           setTimeout(() => {
             blockBot(FIXED_SESSION_ID, `KITS Guntur website scraping blocked`);
@@ -250,22 +267,40 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
       }
 
       if (activity.type === 'mouseMove') {
-        setHumanScore(prev => Math.min(100, prev + 0.5));
-      } else if (activity.type === 'keyPress') {
         setHumanScore(prev => Math.min(100, prev + 0.8));
+      } else if (activity.type === 'keyPress') {
+        setHumanScore(prev => Math.min(100, prev + 1.2));
       } else if (activity.type === 'mouseClick') {
-        setHumanScore(prev => Math.min(100, prev + 1));
+        setHumanScore(prev => Math.min(100, prev + 1.5));
       } else if (activity.type === 'apiRequest') {
-        setHumanScore(prev => Math.max(0, prev - 2));
+        const requestData = activity.data;
+        const isScraping = requestData.action === 'scrape' || 
+                           requestData.action === 'rapid-scrape' ||
+                           requestData.action === 'repetitive-access';
+        
+        if (isScraping) {
+          setHumanScore(prev => Math.max(0, prev - 3));
+        } else {
+          setHumanScore(prev => Math.max(0, prev - 1.5));
+        }
       } else if (activity.type === 'scrollEvent') {
-        setHumanScore(prev => Math.min(100, prev + 0.3));
+        setHumanScore(prev => Math.min(100, prev + 0.5));
       }
 
       if (activity.type === 'apiRequest') {
-        setSecurityScore(prev => Math.max(0, prev - 1));
+        const requestData = activity.data;
+        const isScraping = requestData.action === 'scrape' || 
+                           requestData.action === 'rapid-scrape' ||
+                           requestData.action === 'repetitive-access';
+        
+        if (isScraping) {
+          setSecurityScore(prev => Math.max(0, prev - 2));
+        } else {
+          setSecurityScore(prev => Math.max(0, prev - 1));
+        }
       } else {
-        if (Math.random() > 0.7) {
-          setSecurityScore(prev => Math.min(100, prev + 0.5));
+        if (Math.random() > 0.65) {
+          setSecurityScore(prev => Math.min(100, prev + 0.7));
         }
       }
 
@@ -279,11 +314,18 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
     setActivityHistory(prev => [...prev, newActivity].slice(-50));
 
     if (activity.type === 'apiRequest') {
-      if (activity.data.url && typeof activity.data.url === 'string' && 
-          activity.data.url.includes('kitsguntur.ac.in')) {
-        addLog('warning', `KITS Guntur scraping attempt blocked: ${activity.data.url}`, activity.data);
-      } else if (activity.data.action === 'scrape' || activity.data.action === 'rapid-scrape') {
-        addLog('warning', `Web scraping detected: ${activity.data.url || 'Unknown URL'}`, activity.data);
+      const requestData = activity.data;
+      
+      const isKitsScraping = 
+        (requestData.url && typeof requestData.url === 'string' && requestData.url.includes('kitsguntur.ac.in')) ||
+        (requestData.message && typeof requestData.message === 'string' && 
+          (requestData.message.toLowerCase().includes('kits') || 
+           requestData.message.toLowerCase().includes('kakinada')));
+           
+      if (isKitsScraping) {
+        addLog('warning', `KITS Guntur scraping attempt blocked: ${requestData.url || requestData.message}`, requestData);
+      } else if (requestData.action === 'scrape' || requestData.action === 'rapid-scrape') {
+        addLog('warning', `Web scraping detected: ${requestData.url || 'Unknown URL'}`, requestData);
       }
     }
   };

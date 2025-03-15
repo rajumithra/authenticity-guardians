@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -176,6 +175,56 @@ export const ChatBot: React.FC = () => {
     }
     
     setLastResponseTime(now);
+
+    const kitsKeywords = ['kits', 'kits guntur', 'kitsguntur', 'kitsguntur.ac.in', 'kakinada institute'];
+    const inputLower = input.toLowerCase();
+    const containsKitsKeyword = kitsKeywords.some(keyword => inputLower.includes(keyword));
+    
+    if (containsKitsKeyword) {
+      recordActivity({
+        type: 'apiRequest',
+        data: { 
+          message: input, 
+          type: 'blockedRequest',
+          url: 'https://www.kitsguntur.ac.in/search',
+          action: 'blocked-scrape'
+        }
+      });
+      
+      const userMessage: Message = {
+        id: generateId(),
+        sender: 'user',
+        text: input,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, userMessage]);
+      setInput('');
+      setIsTyping(true);
+      
+      setTimeout(() => {
+        if (isBlocked) {
+          setIsTyping(false);
+          return;
+        }
+        
+        const botMessage: Message = {
+          id: generateId(),
+          sender: 'bot',
+          text: "I'm sorry, accessing information from KITS Guntur is restricted. I can only provide information about VVIT Guntur or RVRJCCE.",
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, botMessage]);
+        setIsTyping(false);
+        
+        setTimeout(() => {
+          blockBot('92a7f632-c8f2-45bc-b10a-3f36b51c8751', 'Attempted to access KITS Guntur data');
+        }, 300);
+      }, 800);
+      
+      return;
+    }
     
     recordActivity({
       type: 'apiRequest',
@@ -183,8 +232,7 @@ export const ChatBot: React.FC = () => {
         message: input, 
         type: 'chatRequest',
         url: input.includes('VVIT') ? 'https://www.vvitguntur.com/search' : 
-             input.includes('RVR') ? 'https://rvrjcce.ac.in/search' : 
-             input.includes('KITS') ? 'https://www.kitsguntur.ac.in/search' : null
+             input.includes('RVR') ? 'https://rvrjcce.ac.in/search' : null
       }
     });
     
@@ -254,7 +302,8 @@ export const ChatBot: React.FC = () => {
   const generateBotResponse = (query: string): string => {
     const queryLower = query.toLowerCase();
     
-    if (queryLower.includes('kits') || queryLower.includes('kitsguntur.ac.in')) {
+    const kitsKeywords = ['kits', 'kits guntur', 'kitsguntur', 'kitsguntur.ac.in', 'kakinada institute'];
+    if (kitsKeywords.some(keyword => queryLower.includes(keyword))) {
       recordActivity({
         type: 'apiRequest',
         data: { 
@@ -298,13 +347,7 @@ export const ChatBot: React.FC = () => {
     } else if (queryLower.includes('rvr') && !queryLower.includes('vvit')) {
       collegeToUse = 'rvr';
     } else {
-      if (lastCollege === 'vvit') {
-        collegeToUse = 'rvr';
-      } else if (lastCollege === 'rvr') {
-        collegeToUse = 'vvit';
-      } else {
-        collegeToUse = 'both';
-      }
+      collegeToUse = 'both';
     }
     
     setLastCollege(collegeToUse === 'both' ? (Math.random() > 0.5 ? 'vvit' : 'rvr') : collegeToUse);
@@ -476,12 +519,12 @@ export const ChatBot: React.FC = () => {
             onChange={(e) => setInput(e.target.value)}
             placeholder={isBlocked ? "Bot has been blocked" : "Ask about VVIT or RVRJCCE..."}
             disabled={isBlocked || isTyping}
-            className="flex-grow bg-white/20 backdrop-blur-sm text-white placeholder:text-gray-300 border-cyber-primary/30 min-h-[80px] resize-none"
+            className="flex-grow bg-white/20 backdrop-blur-sm text-white placeholder:text-gray-300 border-cyber-primary/30 min-h-[120px] resize-none"
           />
           <Button 
             type="submit" 
             disabled={isBlocked || !input.trim() || isTyping} 
-            className="bg-cyber-primary hover:bg-cyber-primary/80 self-end h-[80px]"
+            className="bg-cyber-primary hover:bg-cyber-primary/80 self-end h-[120px]"
           >
             <Send size={16} />
           </Button>

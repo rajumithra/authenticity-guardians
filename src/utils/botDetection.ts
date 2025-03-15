@@ -1,3 +1,4 @@
+
 import { BotScore, UserSession, BotType } from '../models/BotDetectionTypes';
 
 // Analyze user behavior to determine bot likelihood
@@ -70,22 +71,36 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
     newScore.navigationPattern = Math.min(100, botScore.navigationPattern + 3);
   }
   
-  // Analyze request patterns (API calls) - ENHANCED FOR BETTER SCRAPING DETECTION
+  // Analyze request patterns (API calls) - ENHANCED KITS GUNTUR BLOCKING
   const apiRequests = recentActivities.filter(a => a.type === 'apiRequest');
   if (apiRequests.length > 0) {
-    // Look specifically for kitsguntur.ac.in scraping attempts
-    const kitsScrapingRequests = apiRequests.filter(a => 
-      (a.data.url && typeof a.data.url === 'string' && a.data.url.includes('kitsguntur.ac.in'))
-    );
+    // Improved detection for KITS Guntur scraping attempts
+    const kitsScrapingRequests = apiRequests.filter(a => {
+      // Check URL mentions
+      const urlContainsKits = a.data.url && 
+                              typeof a.data.url === 'string' && 
+                              a.data.url.includes('kitsguntur.ac.in');
+      
+      // Check message content for mentions of KITS
+      const messageContainsKits = a.data.message && 
+                                  typeof a.data.message === 'string' && 
+                                  (a.data.message.toLowerCase().includes('kits') || 
+                                   a.data.message.toLowerCase().includes('kakinada'));
+      
+      // Check action type
+      const isBlockedScrape = a.data.action === 'blocked-scrape';
+      
+      return urlContainsKits || messageContainsKits || isBlockedScrape;
+    });
     
     // If KITS scraping requests found, drastically increase the score
     if (kitsScrapingRequests.length > 0) {
       // Very aggressive penalty for KITS scraping
-      newScore.requestPattern = Math.min(100, botScore.requestPattern + kitsScrapingRequests.length * 20);
+      newScore.requestPattern = Math.min(100, botScore.requestPattern + kitsScrapingRequests.length * 25);
       
       // Even a single KITS scraping request is enough for high penalty
       if (kitsScrapingRequests.length >= 1) {
-        newScore.requestPattern = Math.min(100, newScore.requestPattern + 40);
+        newScore.requestPattern = Math.min(100, newScore.requestPattern + 50);
       }
     } else {
       // Check for other scraping actions
@@ -256,7 +271,7 @@ export const detectBotType = (score: BotScore): BotType | null => {
   }
   
   // Determine bot type based on scores
-  if (score.requestPattern > 50) {
+  if (score.requestPattern > 40) {
     return 'scraper';
   }
   
