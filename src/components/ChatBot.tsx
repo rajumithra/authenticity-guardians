@@ -1,6 +1,8 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useBotDetection } from '@/context/BotDetectionContext';
 import { Badge } from '@/components/ui/badge';
@@ -469,18 +471,17 @@ export const ChatBot: React.FC = () => {
         </div>
         
         <form onSubmit={handleSendMessage} className="flex w-full space-x-2">
-          <Input
-            ref={inputRef}
+          <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={isBlocked ? "Bot has been blocked" : "Ask about VVIT or RVRJCCE..."}
             disabled={isBlocked || isTyping}
-            className="flex-grow bg-white/20 backdrop-blur-sm text-white placeholder:text-gray-300 border-cyber-primary/30"
+            className="flex-grow bg-white/20 backdrop-blur-sm text-white placeholder:text-gray-300 border-cyber-primary/30 min-h-[80px] resize-none"
           />
           <Button 
             type="submit" 
             disabled={isBlocked || !input.trim() || isTyping} 
-            className="bg-cyber-primary hover:bg-cyber-primary/80"
+            className="bg-cyber-primary hover:bg-cyber-primary/80 self-end h-[80px]"
           >
             <Send size={16} />
           </Button>
