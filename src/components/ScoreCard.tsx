@@ -40,24 +40,26 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ title, score, type, icon }
   const [displayScore, setDisplayScore] = useState(score);
   const [previousScore, setPreviousScore] = useState(score);
   
-  // Animate score changes for a smoother UI experience
+  // Animate score changes for a smoother UI experience with faster animation speed
   useEffect(() => {
     if (score !== previousScore) {
       setPreviousScore(score);
       
-      // Gradually animate to new score
+      // Gradually animate to new score with faster transitions
       const interval = setInterval(() => {
         setDisplayScore(current => {
           if (current < score) {
-            return Math.min(current + 1, score);
+            // Increase by up to 2 points at a time for faster updates
+            return Math.min(current + (score - current > 5 ? 2 : 1), score);
           } else if (current > score) {
-            return Math.max(current - 1, score);
+            // Decrease by up to 2 points at a time for faster updates
+            return Math.max(current - (current - score > 5 ? 2 : 1), score);
           } else {
             clearInterval(interval);
             return current;
           }
         });
-      }, 20);
+      }, 15); // Faster animation interval
       
       return () => clearInterval(interval);
     }
@@ -97,10 +99,10 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ title, score, type, icon }
           <Progress 
             value={displayScore} 
             max={100}
-            className="h-2 rounded-full overflow-hidden" 
+            className="h-2.5 rounded-full overflow-hidden" 
           />
           <div 
-            className={`absolute inset-0 bg-gradient-to-r ${getColorClass()} opacity-80 h-2 rounded-full transition-all duration-300`}
+            className={`absolute inset-0 bg-gradient-to-r ${getColorClass()} opacity-80 h-2.5 rounded-full transition-all duration-200`}
             style={{ width: `${displayScore}%` }}
           ></div>
         </div>

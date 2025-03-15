@@ -8,8 +8,8 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
   // Deep copy of the current score
   const newScore: BotScore = { ...botScore };
   
-  // Get recent activities for analysis
-  const recentActivities = activities.slice(-30);
+  // Get recent activities for analysis - increased sample size for more responsive detection
+  const recentActivities = activities.slice(-50);
   
   // If no recent activities, return the current score
   if (recentActivities.length === 0) return botScore;
@@ -33,18 +33,18 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
     newScore.mouseMovement = Math.min(100, botScore.mouseMovement + 5);
   }
   
-  // Analyze keyboard patterns
+  // Analyze keyboard patterns - more weight to keyboard activity
   const keyPresses = recentActivities.filter(a => a.type === 'keyPress');
   if (keyPresses.length > 0) {
     // Natural typing has varied timing between keypresses
     // Bots often type with very consistent timing
     const typingNaturality = calculateTypingNaturality(keyPresses);
     
-    // Update the score (decrease for more natural typing)
-    newScore.keyboardPattern = Math.max(0, botScore.keyboardPattern - typingNaturality);
+    // Update the score (decrease for more natural typing) - more aggressive change
+    newScore.keyboardPattern = Math.max(0, botScore.keyboardPattern - (typingNaturality * 1.5));
     
-    // Random chance of slight increase to simulate learning
-    if (Math.random() > 0.7) {
+    // Less random chance of slight increase
+    if (Math.random() > 0.8) {
       newScore.keyboardPattern = Math.min(100, newScore.keyboardPattern + 1);
     }
   } else {
@@ -52,19 +52,19 @@ export const analyzeUserBehavior = (session: UserSession): BotScore => {
     newScore.keyboardPattern = Math.min(100, botScore.keyboardPattern + 4);
   }
   
-  // Analyze navigation patterns (clicks)
+  // Analyze navigation patterns (clicks) - more weight to click patterns
   const clicks = recentActivities.filter(a => a.type === 'mouseClick');
   if (clicks.length > 0) {
     // Humans typically click on visible elements with pauses
     // Bots might click very rapidly or on invisible elements
     const clickNaturality = calculateClickNaturality(clicks);
     
-    // Update the score (decrease for more natural clicking)
-    newScore.navigationPattern = Math.max(0, botScore.navigationPattern - clickNaturality);
+    // Update the score (decrease for more natural clicking) - more aggressive change
+    newScore.navigationPattern = Math.max(0, botScore.navigationPattern - (clickNaturality * 1.3));
     
-    // Random chance of slight increase to simulate learning
-    if (Math.random() > 0.8) {
-      newScore.navigationPattern = Math.min(100, newScore.navigationPattern + 2);
+    // Less random chance of slight increase
+    if (Math.random() > 0.85) {
+      newScore.navigationPattern = Math.min(100, newScore.navigationPattern + 1.5);
     }
   } else {
     // No clicks is slightly suspicious

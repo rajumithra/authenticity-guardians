@@ -85,6 +85,7 @@ export const ChatBot: React.FC = () => {
   const [lastResponseTime, setLastResponseTime] = useState<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const [lastCollege, setLastCollege] = useState<string | null>(null);
+  const [previousResponses, setPreviousResponses] = useState<Set<string>>(new Set());
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -347,37 +348,59 @@ export const ChatBot: React.FC = () => {
     } else if (queryLower.includes('rvr') && !queryLower.includes('vvit')) {
       collegeToUse = 'rvr';
     } else {
-      collegeToUse = 'both';
+      collegeToUse = lastCollege === 'vvit' ? 'rvr' : 'vvit';
     }
     
-    setLastCollege(collegeToUse === 'both' ? (Math.random() > 0.5 ? 'vvit' : 'rvr') : collegeToUse);
+    setLastCollege(collegeToUse);
     
-    if (collegeToUse === 'both') {
-      const vvitSite = sampleWebsites.find(site => site.url.includes('vvitguntur.com'));
-      const rvrSite = sampleWebsites.find(site => site.url.includes('rvrjcce.ac.in'));
-      
-      return `Here's information from both colleges:\n\n` +
-             `VVIT Guntur: ${vvitSite?.content}\n\n` +
-             `RVRJC College: ${rvrSite?.content}`;
-    } else if (collegeToUse === 'vvit') {
+    let responseContent: string;
+    
+    if (collegeToUse === 'vvit') {
       if (queryLower.includes('course') || queryLower.includes('program') || queryLower.includes('degree')) {
-        return `Based on information from ${sampleWebsites[1].url}: ${sampleWebsites[1].content}`;
+        responseContent = `VVIT Guntur offers: ${sampleWebsites[1].content}`;
       } else if (queryLower.includes('placement') || queryLower.includes('job') || queryLower.includes('career')) {
-        return `Based on information from ${sampleWebsites[5].url}: ${sampleWebsites[5].content}`;
+        responseContent = `VVIT Placement information: ${sampleWebsites[5].content}`;
       } else {
-        return `From ${sampleWebsites[0].url}: ${sampleWebsites[0].content}`;
+        responseContent = `About VVIT: ${sampleWebsites[0].content}`;
       }
-    } else {
+    } else { // rvr
       if (queryLower.includes('facilit') || queryLower.includes('campus') || queryLower.includes('infrastructure')) {
-        return `According to ${sampleWebsites[3].url}: ${sampleWebsites[3].content}`;
+        responseContent = `RVRJC facilities: ${sampleWebsites[3].content}`;
       } else if (queryLower.includes('admission') || queryLower.includes('apply')) {
-        return `As per ${sampleWebsites[4].url}: ${sampleWebsites[4].content}`;
+        responseContent = `RVRJC admissions: ${sampleWebsites[4].content}`;
       } else if (queryLower.includes('research') || queryLower.includes('innovation') || queryLower.includes('project')) {
-        return `Based on ${sampleWebsites[6].url}: ${sampleWebsites[6].content}`;
+        responseContent = `RVRJC research activities: ${sampleWebsites[6].content}`;
       } else {
-        return `From ${sampleWebsites[2].url}: ${sampleWebsites[2].content}`;
+        responseContent = `About RVRJC: ${sampleWebsites[2].content}`;
       }
     }
+    
+    if (previousResponses.has(responseContent)) {
+      const alternativeWebsites = allowedWebsites.filter(site => 
+        collegeToUse === 'vvit' ? site.url.includes('vvitguntur.com') : site.url.includes('rvrjcce.ac.in')
+      );
+      
+      for (const site of alternativeWebsites) {
+        if (!previousResponses.has(site.content)) {
+          responseContent = `${collegeToUse.toUpperCase() === 'VVIT' ? 'VVIT Guntur' : 'RVRJC College'} - ${site.title}: ${site.content}`;
+          break;
+        }
+      }
+    }
+    
+    setPreviousResponses(prev => {
+      const newSet = new Set(prev);
+      newSet.add(responseContent);
+      
+      if (newSet.size > 5) {
+        const iterator = newSet.values();
+        newSet.delete(iterator.next().value);
+      }
+      
+      return newSet;
+    });
+    
+    return responseContent;
   };
 
   const changeCrawlRate = (rate: 'slow' | 'normal' | 'aggressive') => {
@@ -519,12 +542,12 @@ export const ChatBot: React.FC = () => {
             onChange={(e) => setInput(e.target.value)}
             placeholder={isBlocked ? "Bot has been blocked" : "Ask about VVIT or RVRJCCE..."}
             disabled={isBlocked || isTyping}
-            className="flex-grow bg-white/20 backdrop-blur-sm text-white placeholder:text-gray-300 border-cyber-primary/30 min-h-[120px] resize-none"
+            className="flex-grow bg-white/20 backdrop-blur-sm text-white placeholder:text-gray-300 border-cyber-primary/30 min-h-[150px] resize-none"
           />
           <Button 
             type="submit" 
             disabled={isBlocked || !input.trim() || isTyping} 
-            className="bg-cyber-primary hover:bg-cyber-primary/80 self-end h-[120px]"
+            className="bg-cyber-primary hover:bg-cyber-primary/80 self-end h-[150px]"
           >
             <Send size={16} />
           </Button>

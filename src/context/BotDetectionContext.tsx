@@ -78,7 +78,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
     const handleMouseMove = (e: MouseEvent) => {
       if (currentSession && !isBlocked) {
         setMouseMovementCount(prev => {
-          if (prev >= 4) {
+          if (prev >= 2) {
             recordActivity({
               type: 'mouseMove',
               data: { x: e.clientX, y: e.clientY }
@@ -137,7 +137,7 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
   useEffect(() => {
     const scoreUpdateInterval = setInterval(() => {
       setScoreUpdateCounter(prev => prev + 1);
-    }, 350);
+    }, 200);
     
     return () => clearInterval(scoreUpdateInterval);
   }, []);
@@ -204,24 +204,26 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, [currentSession, recentApiRequests, isBlocked, scoreUpdateCounter]);
 
   const initSession = () => {
-    const newSession: UserSession = {
-      id: FIXED_SESSION_ID,
-      ip: FIXED_IP,
-      userAgent: navigator.userAgent,
-      startTime: Date.now(),
-      lastActive: Date.now(),
-      activities: [],
-      botScore: initialBotScore,
-      isBlocked: false,
-      botType: null,
-      device: getDeviceInfo()
-    };
+    if (!currentSession) {
+      const newSession: UserSession = {
+        id: FIXED_SESSION_ID,
+        ip: FIXED_IP,
+        userAgent: navigator.userAgent,
+        startTime: Date.now(),
+        lastActive: Date.now(),
+        activities: [],
+        botScore: initialBotScore,
+        isBlocked: false,
+        botType: null,
+        device: getDeviceInfo()
+      };
 
-    setCurrentSession(newSession);
-    setIsBlocked(false);
-    setHumanScore(60);
-    setSecurityScore(70);
-    addLog('info', `New session started: ${FIXED_SESSION_ID}`);
+      setCurrentSession(newSession);
+      setIsBlocked(false);
+      setHumanScore(60);
+      setSecurityScore(70);
+      addLog('info', `New session started: ${FIXED_SESSION_ID}`);
+    }
   };
 
   const recordActivity = (activity: Omit<UserActivity, 'timestamp'>) => {
@@ -267,11 +269,11 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
       }
 
       if (activity.type === 'mouseMove') {
-        setHumanScore(prev => Math.min(100, prev + 0.8));
-      } else if (activity.type === 'keyPress') {
         setHumanScore(prev => Math.min(100, prev + 1.2));
+      } else if (activity.type === 'keyPress') {
+        setHumanScore(prev => Math.min(100, prev + 1.8));
       } else if (activity.type === 'mouseClick') {
-        setHumanScore(prev => Math.min(100, prev + 1.5));
+        setHumanScore(prev => Math.min(100, prev + 2.0));
       } else if (activity.type === 'apiRequest') {
         const requestData = activity.data;
         const isScraping = requestData.action === 'scrape' || 
@@ -279,12 +281,12 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
                            requestData.action === 'repetitive-access';
         
         if (isScraping) {
-          setHumanScore(prev => Math.max(0, prev - 3));
+          setHumanScore(prev => Math.max(0, prev - 4));
         } else {
-          setHumanScore(prev => Math.max(0, prev - 1.5));
+          setHumanScore(prev => Math.max(0, prev - 2));
         }
       } else if (activity.type === 'scrollEvent') {
-        setHumanScore(prev => Math.min(100, prev + 0.5));
+        setHumanScore(prev => Math.min(100, prev + 1.0));
       }
 
       if (activity.type === 'apiRequest') {
@@ -294,13 +296,13 @@ export const BotDetectionProvider: React.FC<{ children: ReactNode }> = ({ childr
                            requestData.action === 'repetitive-access';
         
         if (isScraping) {
-          setSecurityScore(prev => Math.max(0, prev - 2));
+          setSecurityScore(prev => Math.max(0, prev - 3));
         } else {
-          setSecurityScore(prev => Math.max(0, prev - 1));
+          setSecurityScore(prev => Math.max(0, prev - 1.5));
         }
       } else {
-        if (Math.random() > 0.65) {
-          setSecurityScore(prev => Math.min(100, prev + 0.7));
+        if (Math.random() > 0.55) {
+          setSecurityScore(prev => Math.min(100, prev + 1.0));
         }
       }
 
