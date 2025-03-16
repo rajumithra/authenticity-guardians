@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBotDetection } from '@/context/BotDetectionContext';
@@ -13,6 +13,16 @@ import { RefreshCw, ShieldAlert, Activity, Bot, List, Settings } from 'lucide-re
 
 export const Dashboard: React.FC = () => {
   const { currentSession, resetSession, humanScore, securityScore } = useBotDetection();
+  const [updateTrigger, setUpdateTrigger] = useState(0);
+
+  // Force UI updates more frequently
+  useEffect(() => {
+    const updateInterval = setInterval(() => {
+      setUpdateTrigger(prev => prev + 1);
+    }, 150);
+    
+    return () => clearInterval(updateInterval);
+  }, []);
 
   return (
     <div className="min-h-screen bg-cyber-dark text-white p-6 cyber-grid">
@@ -45,6 +55,7 @@ export const Dashboard: React.FC = () => {
               score={humanScore} 
               type="human"
               icon={<Activity className="h-5 w-5 text-emerald-500" />}
+              key={`human-${updateTrigger}`}
             />
             
             <ScoreCard 
@@ -52,6 +63,7 @@ export const Dashboard: React.FC = () => {
               score={currentSession ? currentSession.botScore.total : 0} 
               type="bot"
               icon={<Bot className="h-5 w-5 text-amber-500" />}
+              key={`bot-${updateTrigger}`}
             />
             
             <ScoreCard 
@@ -59,6 +71,7 @@ export const Dashboard: React.FC = () => {
               score={securityScore} 
               type="security"
               icon={<ShieldAlert className="h-5 w-5 text-sky-500" />}
+              key={`security-${updateTrigger}`}
             />
           </div>
 

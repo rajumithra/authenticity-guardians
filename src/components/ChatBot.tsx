@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -84,8 +85,8 @@ export const ChatBot: React.FC = () => {
   const [autoModeActive, setAutoModeActive] = useState(false);
   const [lastResponseTime, setLastResponseTime] = useState<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [lastCollege, setLastCollege] = useState<string | null>(null);
   const [previousResponses, setPreviousResponses] = useState<Set<string>>(new Set());
+  const [collegeAlternator, setCollegeAlternator] = useState<'vvit' | 'rvr'>('vvit');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -129,12 +130,14 @@ export const ChatBot: React.FC = () => {
     let autoModeInterval: NodeJS.Timeout | null = null;
     
     if (autoModeActive && !isBlocked && crawlRate === 'aggressive') {
+      // Balanced questions about both colleges
       const followUpQuestions = [
         'Tell me more about the faculty at VVIT Guntur',
         'What courses are offered at RVRJCCE?',
         'Show me information about the campus facilities at VVIT',
         'What are the admission requirements for RVRJCCE?',
-        'Tell me about the college history of VVIT'
+        'Tell me about the research centers at RVRJCCE',
+        'What is the placement record at VVIT Guntur?'
       ];
       
       autoModeInterval = setInterval(() => {
@@ -177,7 +180,11 @@ export const ChatBot: React.FC = () => {
     
     setLastResponseTime(now);
 
-    const kitsKeywords = ['kits', 'kits guntur', 'kitsguntur', 'kitsguntur.ac.in', 'kakinada institute'];
+    // Enhanced KITS Guntur keyword detection
+    const kitsKeywords = [
+      'kits', 'kits guntur', 'kitsguntur', 'kitsguntur.ac.in', 'kakinada institute',
+      'kakinada', 'kits college', 'kits engineering', 'k.i.t.s'
+    ];
     const inputLower = input.toLowerCase();
     const containsKitsKeyword = kitsKeywords.some(keyword => inputLower.includes(keyword));
     
@@ -254,7 +261,7 @@ export const ChatBot: React.FC = () => {
         recordActivity({
           type: 'apiRequest',
           data: { 
-            url: `https://www.vvitguntur.com/page${i}`, 
+            url: `https://www.${i % 2 === 0 ? 'vvitguntur.com' : 'rvrjcce.ac.in'}/page${i}`, 
             action: 'rapid-scrape', 
             timestamp: Date.now() + i * 100 
           }
@@ -303,7 +310,12 @@ export const ChatBot: React.FC = () => {
   const generateBotResponse = (query: string): string => {
     const queryLower = query.toLowerCase();
     
-    const kitsKeywords = ['kits', 'kits guntur', 'kitsguntur', 'kitsguntur.ac.in', 'kakinada institute'];
+    // Enhanced KITS Guntur detection
+    const kitsKeywords = [
+      'kits', 'kits guntur', 'kitsguntur', 'kitsguntur.ac.in', 'kakinada institute',
+      'kakinada', 'kits college', 'kits engineering', 'k.i.t.s'
+    ];
+    
     if (kitsKeywords.some(keyword => queryLower.includes(keyword))) {
       recordActivity({
         type: 'apiRequest',
@@ -325,6 +337,7 @@ export const ChatBot: React.FC = () => {
       !website.url.includes('kitsguntur.ac.in')
     );
     
+    // Record API activity based on query
     for (const website of allowedWebsites) {
       if ((queryLower.includes('vvit') && website.url.includes('vvitguntur.com')) || 
           (queryLower.includes('rvr') && website.url.includes('rvrjcce.ac.in')) ||
@@ -341,17 +354,18 @@ export const ChatBot: React.FC = () => {
       }
     }
     
-    let collegeToUse: string;
+    // Determine which college to respond about
+    let collegeToUse: 'vvit' | 'rvr';
     
     if (queryLower.includes('vvit') && !queryLower.includes('rvr')) {
       collegeToUse = 'vvit';
     } else if (queryLower.includes('rvr') && !queryLower.includes('vvit')) {
       collegeToUse = 'rvr';
     } else {
-      collegeToUse = lastCollege === 'vvit' ? 'rvr' : 'vvit';
+      // Alternate between colleges for general queries
+      collegeToUse = collegeAlternator;
+      setCollegeAlternator(prev => prev === 'vvit' ? 'rvr' : 'vvit');
     }
-    
-    setLastCollege(collegeToUse);
     
     let responseContent: string;
     
@@ -375,6 +389,7 @@ export const ChatBot: React.FC = () => {
       }
     }
     
+    // Prevent repetitive responses
     if (previousResponses.has(responseContent)) {
       const alternativeWebsites = allowedWebsites.filter(site => 
         collegeToUse === 'vvit' ? site.url.includes('vvitguntur.com') : site.url.includes('rvrjcce.ac.in')
@@ -388,6 +403,7 @@ export const ChatBot: React.FC = () => {
       }
     }
     
+    // Track previous responses to avoid repetition
     setPreviousResponses(prev => {
       const newSet = new Set(prev);
       newSet.add(responseContent);
@@ -542,12 +558,12 @@ export const ChatBot: React.FC = () => {
             onChange={(e) => setInput(e.target.value)}
             placeholder={isBlocked ? "Bot has been blocked" : "Ask about VVIT or RVRJCCE..."}
             disabled={isBlocked || isTyping}
-            className="flex-grow bg-white/20 backdrop-blur-sm text-white placeholder:text-gray-300 border-cyber-primary/30 min-h-[150px] resize-none"
+            className="flex-grow bg-white/20 backdrop-blur-sm text-white placeholder:text-gray-300 border-cyber-primary/30 min-h-[200px] resize-none"
           />
           <Button 
             type="submit" 
             disabled={isBlocked || !input.trim() || isTyping} 
-            className="bg-cyber-primary hover:bg-cyber-primary/80 self-end h-[150px]"
+            className="bg-cyber-primary hover:bg-cyber-primary/80 self-end h-[200px]"
           >
             <Send size={16} />
           </Button>
