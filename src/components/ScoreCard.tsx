@@ -41,7 +41,7 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ title, score, type, icon }
   const [previousScore, setPreviousScore] = useState(score);
   const [isChanging, setIsChanging] = useState(false);
   
-  // Animate score changes for a smoother UI experience with even faster animation speed
+  // Only animate score changes when an actual change happens
   useEffect(() => {
     if (score !== previousScore) {
       setPreviousScore(score);
@@ -62,7 +62,7 @@ export const ScoreCard: React.FC<ScoreCardProps> = ({ title, score, type, icon }
             return current;
           }
         });
-      }, 12); // Even faster animation interval
+      }, 12); // Fast animation interval
       
       return () => clearInterval(interval);
     }
