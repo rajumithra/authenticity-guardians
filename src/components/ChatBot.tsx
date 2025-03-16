@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,6 +86,7 @@ export const ChatBot: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previousResponses, setPreviousResponses] = useState<Set<string>>(new Set());
   const [collegeAlternator, setCollegeAlternator] = useState<'vvit' | 'rvr'>('vvit');
+  const [lastCollegeUsed, setLastCollegeUsed] = useState<'vvit' | 'rvr'>('vvit');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -130,7 +130,6 @@ export const ChatBot: React.FC = () => {
     let autoModeInterval: NodeJS.Timeout | null = null;
     
     if (autoModeActive && !isBlocked && crawlRate === 'aggressive') {
-      // Balanced questions about both colleges
       const followUpQuestions = [
         'Tell me more about the faculty at VVIT Guntur',
         'What courses are offered at RVRJCCE?',
@@ -180,7 +179,6 @@ export const ChatBot: React.FC = () => {
     
     setLastResponseTime(now);
 
-    // Enhanced KITS Guntur keyword detection
     const kitsKeywords = [
       'kits', 'kits guntur', 'kitsguntur', 'kitsguntur.ac.in', 'kakinada institute',
       'kakinada', 'kits college', 'kits engineering', 'k.i.t.s'
@@ -310,7 +308,6 @@ export const ChatBot: React.FC = () => {
   const generateBotResponse = (query: string): string => {
     const queryLower = query.toLowerCase();
     
-    // Enhanced KITS Guntur detection
     const kitsKeywords = [
       'kits', 'kits guntur', 'kitsguntur', 'kitsguntur.ac.in', 'kakinada institute',
       'kakinada', 'kits college', 'kits engineering', 'k.i.t.s'
@@ -337,7 +334,6 @@ export const ChatBot: React.FC = () => {
       !website.url.includes('kitsguntur.ac.in')
     );
     
-    // Record API activity based on query
     for (const website of allowedWebsites) {
       if ((queryLower.includes('vvit') && website.url.includes('vvitguntur.com')) || 
           (queryLower.includes('rvr') && website.url.includes('rvrjcce.ac.in')) ||
@@ -354,7 +350,6 @@ export const ChatBot: React.FC = () => {
       }
     }
     
-    // Determine which college to respond about
     let collegeToUse: 'vvit' | 'rvr';
     
     if (queryLower.includes('vvit') && !queryLower.includes('rvr')) {
@@ -362,10 +357,10 @@ export const ChatBot: React.FC = () => {
     } else if (queryLower.includes('rvr') && !queryLower.includes('vvit')) {
       collegeToUse = 'rvr';
     } else {
-      // Alternate between colleges for general queries
-      collegeToUse = collegeAlternator;
-      setCollegeAlternator(prev => prev === 'vvit' ? 'rvr' : 'vvit');
+      collegeToUse = lastCollegeUsed === 'vvit' ? 'rvr' : 'vvit';
     }
+    
+    setLastCollegeUsed(collegeToUse);
     
     let responseContent: string;
     
@@ -389,7 +384,6 @@ export const ChatBot: React.FC = () => {
       }
     }
     
-    // Prevent repetitive responses
     if (previousResponses.has(responseContent)) {
       const alternativeWebsites = allowedWebsites.filter(site => 
         collegeToUse === 'vvit' ? site.url.includes('vvitguntur.com') : site.url.includes('rvrjcce.ac.in')
@@ -403,7 +397,6 @@ export const ChatBot: React.FC = () => {
       }
     }
     
-    // Track previous responses to avoid repetition
     setPreviousResponses(prev => {
       const newSet = new Set(prev);
       newSet.add(responseContent);
